@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAYKI - Pantalla de Cocina</title>
+    <style>
+        :root { --bg: #222; --card: #fff; --text: #333; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
+        .header { display: flex; justify-content: space-between; color: white; margin-bottom: 20px; align-items: center; }
+        .header h1 { margin: 0; color: #ff6b00; }
+        .queue-alert { background: #dc3545; color: white; padding: 10px 20px; border-radius: 5px; font-weight: bold; font-size: 1.2em; display: none; }
+        
+        .kds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .card { background: var(--card); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.1s; }
+        .card:hover { border: 3px solid #ff6b00; }
+        
+        .c-header { padding: 15px; display: flex; justify-content: space-between; font-weight: bold; font-size: 1.3em; }
+        .c-header.delivery { background: #ff6b00; color: white; }
+        .c-header.mostrador { background: #17a2b8; color: white; }
+        
+        .c-body { padding: 15px; flex-grow: 1; font-size: 1.2em; }
+        .item-row { margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .guarnicion { color: #2980b9; font-size: 0.9em; padding-left: 20px; font-weight: bold; }
+        .observacion { color: #dc3545; font-weight: bold; font-size: 0.9em; padding-left: 20px; }
+        .obs-general { background: #fff3cd; padding: 10px; border-left: 5px solid #ffc107; margin-top: 10px; font-weight: bold; font-size: 0.95em; }
+        
+        .c-footer { background: #f8f9fa; padding: 15px; text-align: center; font-weight: bold; color: #28a745; font-size: 1.3em; border-top: 1px solid #eee; }
+        .c-footer:hover { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>WAYKI COCINA</h1>
+        <div id="reloj" style="font-size: 1.5em; font-weight: bold;"></div>
+        <div id="alerta_espera" class="queue-alert">⚠️ <span id="num_espera">0</span> pedidos en espera</div>
+    </div>
+
+    <div class="kds-grid" id="tablero"></div>
+
+    <script>
+        setInterval(() => {
+            document.getElementById('reloj').innerText = new Date().toLocaleTimeString('es-AR');
+        }, 1000);
+
+        function cargarPedidos() {
+            let pedidos = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
+            const tablero = document.getElementById('tablero');
+            
+            const aMostrar = pedidos.slice(0, 7);
+            const enEspera = pedidos.length > 7 ? pedidos.length - 7 : 0;
+            
+            if(enEspera > 0) {
+                document.getElementById('alerta_espera').style.display = 'block';
+                document.getElementById('num_espera').innerText = enEspera;
+            } else {
+                document.getElementById('alerta_espera').style.display = 'none';
+            }
+
+            tablero.innerHTML = '';
+            
+            if(pedidos.length === 0) {
+                tablero.innerHTML = '<div style="color: #aaa; font-size: 1.2em; text-align: center; grid-column: span 3; margin-top: 40px;">No hay pedidos pendientes en la cocina. ¡Buen trabajo! 👨‍🍳</div>';
+                return;
+            }
+
+            aMostrar.forEach(p => {
+                let itemsHtml = '';
+                p.items.forEach(i => {
+                    let detalleGuarnicion = (i.guarnicion && i.guarnicion !== 'Sin guarnición') ? `<div class="guarnicion">↳ ${i.guarnicion}</div>` : '';
+                    let detalleExtra = i.obsExtra ? `<div class="observacion">⚠️ ${i.obsExtra}</div>` : '';
+
+                    itemsHtml += `
+                        <div class="item-row">
+                            <strong>${i.cantidad}x ${i.nombre}</strong><br>
+                            ${detalleGuarnicion}
+                            ${detalleExtra}
+                        </div>
+                    `;
+                });
+
+                let obsGeneral = p.obs ? `<div class="obs-general">Nota: ${p.obs}</div>` : '';
+                let tipoPedido = p.tipo ? p.tipo : 'Mostrador';
+                let clienteInfo = p.nombre ? `<div style="font-size: 0.85em; color: #555; margin-bottom: 10px;">Cliente: <b>${p.nombre}</b></div>` : '';
+
+                let card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <div class="c-header ${tipoPedido.toLowerCase()}">
+                        <span>#${p.id}</span>
+                        <span>${p.hora}</span>
+                    </div>
+                    <div class="c-body">
+                        <div style="margin-bottom: 5px; text-align: center; font-weight: bold; font-size: 0.9em; color: #e67e22;">${tipoPedido.toUpperCase()}</div>
+                        ${clienteInfo}
+                        ${itemsHtml}
+                        ${obsGeneral}
+                    </div>
+                    <div class="c-footer" onclick="marcarListo('${p.id}')">
+                        ✔️ CLIC PARA DESPACHAR
+                    </div>
+                `;
+                tablero.appendChild(card);
+            });
+        }
+
+        function marcarListo(id) {
+            // 1. Borrar de la pantalla de cocina
+            let pedidos = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
+            pedidos = pedidos.filter(p => String(p.id) !== String(id));
+            localStorage.setItem('wayki_cocina', JSON.stringify(pedidos));
+
+            // 2. Avisarle a la caja que está listo para que salte la notificación en la PC
+            let listos = JSON.parse(localStorage.getItem('wayki_listos')) || [];
+            listos.push(id);
+            localStorage.setItem('wayki_listos', JSON.stringify(listos));
+
+            cargarPedidos(); 
+        }
+
+        setInterval(cargarPedidos, 2000);
+        cargarPedidos();
+    </script>
+</body>
+</html>

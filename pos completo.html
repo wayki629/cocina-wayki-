@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="tituloPestana">WAYKI - Caja POS (Nuevo Pedido)</title>
+    <!-- Librería SheetJS para leer y generar archivos Excel (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        .container { display: flex; gap: 20px; max-width: 1250px; margin: 0 auto; }
+        .panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .left-panel { flex: 2; }
+        .right-panel { flex: 1; }
+        h2, h3 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .toggle-btn { flex: 1; padding: 10px; border: 1px solid #ccc; background: #e0e0e0; cursor: pointer; text-align: center; border-radius: 4px; font-weight: bold; }
+        .toggle-btn.active { background: #e67e22; color: #fff; border-color: #d35400; }
+        .toggle-btn.active-blue { background: #2980b9; color: #fff; border-color: #1f618d; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 13px; }
+        th { background: #f8f9fa; }
+        .btn { background: #27ae60; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; width: 100%; font-size: 15px; margin-top: 5px; }
+        .btn:hover { background: #219653; }
+        .btn-danger { background: #c0392b; width: auto; padding: 4px 8px; font-size: 12px; }
+        .btn-danger:hover { background: #962d22; }
+        .btn-print { background: #2980b9; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-print:hover { background: #1f618d; }
+        .btn-whatsapp { background: #25D366; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; text-decoration: none; display: inline-block; width: 100%; text-align: center; margin-top: 8px; }
+        .btn-whatsapp:hover { background: #1ebe5d; }
+        .total-box { font-size: 22px; font-weight: bold; color: #e67e22; text-align: right; margin: 15px 0; }
+        .sales-list { max-height: 420px; overflow-y: auto; }
+        
+        .sale-item { background: #f9f9f9; border-left: 6px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 12px; transition: all 0.3s; }
+        .sale-item.estado-cocina { border-left-color: #f39c12; background: #fef9e7; } 
+        .sale-item.estado-cobrado { border-left-color: #27ae60; background: #eafaf1; } 
+
+        .shortcut-hint { font-size: 11px; color: #7f8c8d; margin-top: 3px; }
+
+        .brand-logo-container {
+            background-color: #6a0d1b;
+            color: #fdf0d5;
+            text-align: center;
+            padding: 15px 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .brand-logo-title {
+            font-family: 'Georgia', serif;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 0;
+            color: #fdf0d5;
+        }
+        .brand-logo-subtitle {
+            font-size: 13px;
+            letter-spacing: 1px;
+            margin-top: 4px;
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            width: 450px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        @media print {
+            @page { margin: 0; size: auto; }
+            body { margin-bottom: 30px; }
+            .no-print { display: none !important; }
+            body * { visibility: hidden; }
+            #ticket-impresion, #ticket-impresion * { visibility: visible; }
+            #ticket-impresion { 
+                position: absolute; left: 0; top: 0; width: 76mm; 
+                font-family: 'Arial', sans-serif; font-size: 19px; line-height: 1.4;
+                color: #000 !important; background: #fff !important; font-weight: bold;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- MODAL REPORTES / CORTE DE CAJA -->
+<div id="modalReportes" class="modal">
+    <div class="modal-box">
+        <h3>📊 Corte de Caja y Reporte por Fechas</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <div style="flex: 1;">
+                <label style="font-size: 12px;">Desde:</label>
+                <input type="date" id="fechaDesde" onchange="calcularReporteRango()" style="font-size: 13px; padding: 6px;">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 12px;">Hasta:</label>
+                <input type="date" id="fechaHasta" onchange="calcularReporteRango()" style="font-size: 13px; padding: 6px;">
+            </div>
+        </div>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 15px; font-size: 15px;">
+            <p>💵 Total en Efectivo: <b id="repEfectivo" style="color: #27ae60; font-size: 18px;">$0</b></p>
+            <p>📱 Total en Transferencia: <b id="repTransf" style="color: #2980b9; font-size: 18px;">$0</b></p>
+            <hr style="border: 0; border-top: 1px solid #ddd;">
+            <p style="font-size: 18px;">💰 <b>TOTAL GENERAL: <span id="repTotal" style="color: #e67e22;">$0</span></b></p>
+        </div>
+        <button class="btn" onclick="cerrarReportes()" style="margin-top: 20px; background: #34495e;">Cerrar Ventana</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="panel left-panel">
+        <div class="brand-logo-container">
+            <div class="brand-logo-title">COMIDAS WAYKI</div>
+            <div class="brand-logo-subtitle">Regionales, Saludables y Más</div>
+        </div>
+
+        <!-- Panel de Gestión de Menú por Excel Vertical Completo Lunes a Domingo -->
+        <div style="background: #eafaf1; border: 1px solid #27ae60; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+            <label style="color: #27ae60; margin-bottom: 5px; font-size: 13px; font-weight: bold;">📁 Menú Semanal por Excel (Lunes a Domingo):</label>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 6px;">
+                <input type="file" id="excelFile" accept=".xlsx, .xls" onchange="cargarExcelVertical(event)" style="font-size: 12px; background: white; flex: 2;">
+                <button type="button" onclick="descargarPlantillaVertical()" style="flex: 1; padding: 6px; background: #2980b9; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">⬇️ Descargar Plantilla</button>
+            </div>
+            <div id="estadoExcel" style="font-size: 11px; color: #555;">⚠️ Usando menú base o predeterminado.</div>
+        </div>
+
+        <!-- Indicador de Día y Turno Automático -->
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #fdf0d5; padding: 8px; border-radius: 6px; border: 1px solid #f39c12; align-items: center;">
+            <div style="flex: 1; font-size: 13px;">📅 Día: <b id="lblDiaActual">-</b></div>
+            <div style="flex: 1; font-size: 13px;">⏰ Turno: 
+                <select id="selectTurnoActual" onchange="renderDatalistProductos()" style="width: auto; padding: 2px; font-weight: bold; font-size: 12px;">
+                    <option value="Mañana">Mañana</option>
+                    <option value="Noche">Noche</option>
+                </select>
+            </div>
+        </div>
+
+        <h2 id="tituloCaja" style="font-size: 18px; margin-bottom: 10px;">Caja POS (Nuevo Pedido)</h2>
+        <div class="shortcut-hint">💡 Atajo: Presioná <b>F12</b> para abrir una nueva pestaña de pedido en simultáneo.</div>
+        
+        <div class="form-group" style="margin-top: 15px;">
+            <label>1. Datos del Cliente</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="clienteNombre" placeholder="Nombre y Apellido" style="flex: 2;" oninput="actualizarTituloDinamico()">
+                <input type="text" id="clienteCel" placeholder="Celular / WhatsApp (Ej: 381...)" style="flex: 1;">
+            </div>
+            <input type="text" id="clienteDireccion" placeholder="Dirección para delivery" style="margin-top: 8px;">
+            <button type="button" class="btn-whatsapp" onclick="enviarWspActual()">💬 Enviar WhatsApp: "Pedido Nº... en camino" 🛵</button>
+        </div>
+
+        <div class="form-group">
+            <label>2. Tipo de Pedido</label>
+            <div class="btn-group">
+                <div id="btnDelivery" class="toggle-btn active" onclick="setTipoPedido('Delivery')">🛵 Delivery</div>
+                <div id="btnMostrador" class="toggle-btn" onclick="setTipoPedido('Mostrador')">🏪 Mostrador</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>3. Medio y Estado de Pago + Calculadora de Vuelto</label>
+            <div class="btn-group">
+                <div id="btnEfectivo" class="toggle-btn active-blue" onclick="setPago('Efectivo')">💵 Efectivo</div>
+                <div id="btnTransferencia" class="toggle-btn" onclick="setTransferencia('Transferencia')">📱 Transferencia</div>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 10px; align-items: center;">
+                <select id="estadoPago" style="background: #fff3cd; font-weight: bold; flex: 2;">
+                    <option value="A COBRAR (Efectivo al entregar)">⚠️ PENDIENTE DE PAGO (Cobrar al entregar / Transferir)</option>
+                    <option value="PAGADO / TRANSFERENCIA OK">✅ PAGADO / TRANSFERENCIA OK</option>
+                </select>
+                <label style="flex: 1; font-size: 13px; display: flex; align-items: center; gap: 5px; cursor: pointer; background: #eafaf1; padding: 8px; border-radius: 4px; border: 1px solid #27ae60;">
+                    <input type="checkbox" id="checkDineroRecibido" style="width: auto;"> <b>Recibido $</b>
+                </label>
+            </div>
+            <div style="margin-top: 8px; background: #f8f9fa; padding: 8px; border-radius: 4px; border: 1px solid #ddd; display: flex; gap: 10px; align-items: center;">
+                <label style="font-size: 12px; margin: 0; flex: 1;">Paga con ($):</label>
+                <input type="number" id="montoPagaCon" placeholder="Ej: 20000" oninput="calcularVuelto()" style="flex: 1; font-size: 13px; padding: 4px;">
+                <div style="flex: 1; font-size: 13px;">Vuelto: <b id="lblVuelto" style="color: #c0392b; font-size: 15px;">$0</b></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>4. Ítems del Pedido (Buscador automático / Excel con Salsas Libres)</label>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 10%;">Cant.</th>
+                        <th style="width: 35%;">Plato / Producto (Lupa)</th>
+                        <th style="width: 15%;">Precio $</th>
+                        <th style="width: 35%;">Guarnición / Salsa / Adicional (Libre)</th>
+                        <th style="width: 5%;">X</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTabla"></tbody>
+            </table>
+            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button type="button" onclick="agregarFila()" style="padding: 6px 12px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Agregar Ítem</button>
+                <button type="button" onclick="agregarPromoRapida()" style="padding: 6px 12px; background: #d35400; color: white; border: none; border-radius: 4px; cursor: pointer;">⭐ Agregar Promoción</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Observaciones Generales</label>
+            <textarea id="observaciones" rows="2" placeholder="Ej: Tocar timbre dos veces, sin tacc, vegano, etc..."></textarea>
+        </div>
+
+        <div class="total-box">Total: $<span id="lblTotal">0</span></div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="btn" id="btnAccionVenta" onclick="cerrarVenta()">🖨️ Cerrar Venta, Imprimir y Enviar a Cocina</button>
+            <button class="btn" id="btnCancelarEdicion" onclick="limpiarFormulario()" style="display:none; background: #7f8c8d; width: auto;">❌ Cancelar</button>
+        </div>
+    </div>
+
+    <div class="panel right-panel">
+        <h3>Ventas de Hoy</h3>
+        <div class="sales-list" id="listaVentas">
+            <p style="color: #7f8c8d; font-size: 13px;">No hay ventas registradas todavía.</p>
+        </div>
+        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
+            <button onclick="window.open('cocina.html', '_blank')" style="background: #2980b9; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer; font-weight:bold;">📺 Abrir Pantalla Cocina (KDS)</button>
+            <button onclick="abrirReportes()" style="background: #e67e22; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer; font-weight:bold;">📅 Ver Corte de Caja / Fechas</button>
+            <button onclick="exportarExcel()" style="background: #27ae60; color:white; border:none; padding:10px; border-radius:4px; cursor:pointer; font-weight:bold;">📊 Exportar Reporte Excel</button>
+        </div>
+    </div>
+</div>
+
+<div id="ticket-impresion" style="display:none;">
+    <div style="text-align: center; margin-bottom: 5px; color: #000;">
+        <div style="font-size: 24px; font-weight: bold; font-family: 'Arial Black', Arial, sans-serif; letter-spacing: 1px;">COMIDAS WAYKI</div>
+        <div style="font-size: 13px; font-weight: bold; margin-top: 2px;">Regionales, Saludables y Más</div>
+    </div>
+    <div style="text-align: center; font-size: 14px; font-weight: bold; color: #000;">Asunción 636 - San Miguel de Tucumán</div>
+    <div style="text-align: center; border-bottom: 2px solid #000; margin: 8px 0;"></div>
+    <div style="font-size: 32px; text-align: center; font-weight: bold;">PEDIDO #<span id="t-nro"></span></div>
+    <div style="font-size: 16px; margin-top: 6px;"><b>Hora:</b> <span id="t-fecha"></span></div>
+    <div style="font-size: 16px;"><b>Tipo:</b> <span id="t-tipo"></span></div>
+    <div style="font-size: 16px;"><b>Cliente:</b> <span id="t-cliente"></span></div>
+    <div style="font-size: 16px;"><b>Tel:</b> <span id="t-tel"></span></div>
+    <div style="font-size: 16px;"><b>Dirección:</b> <span id="t-dir"></span></div>
+    <div style="text-align: center; border-bottom: 2px solid #000; margin: 8px 0;"></div>
+    <div style="font-size: 18px; font-weight: bold;">DETALLE:</div>
+    <div id="t-items" style="font-size: 17px; margin-top: 8px;"></div>
+    <div style="text-align: center; border-bottom: 2px solid #000; margin: 8px 0;"></div>
+    <div style="font-size: 16px;"><b>Obs:</b> <span id="t-obs"></span></div>
+    <div style="font-size: 17px; margin-top: 8px;"><b>ESTADO PAGO:</b><br><span id="t-pago" style="font-size: 19px;"></span></div>
+    <div id="t-vuelto-box" style="font-size: 16px; margin-top: 4px; display:none;"><b>Paga con:</b> $<span id="t-pagan"></span> | <b>Vuelto:</b> <span id="t-vuelton" style="font-size: 18px; font-weight: bold; color: red;"></span></div>
+    <div style="text-align: center; font-size: 26px; font-weight: bold; margin-top: 12px;">TOTAL: $<span id="t-total"></span></div>
+    <div style="text-align: center; border-bottom: 2px solid #000; margin: 8px 0;"></div>
+    <div style="text-align: center; font-size: 15px; font-weight: bold;">¡Gracias por elegir Wayki!</div>
+    
+    <div style="page-break-after: always; visibility: hidden;">.</div>
+</div>
+
+<script>
+    let tipoPedidoActual = 'Delivery';
+    let medioPagoActual = 'Efectivo';
+    let ventasHoy = JSON.parse(localStorage.getItem('wayki_ventas')) || [];
+    let editandoId = null; 
+    let menuVerticalExcel = JSON.parse(localStorage.getItem('wayki_menu_vertical')) || null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+        detectarDiaYTurno();
+        if (menuVerticalExcel) {
+            document.getElementById('estadoExcel').innerText = "✅ Menú semanal (Lunes a Domingo) cargado con éxito.";
+        }
+        if (document.querySelectorAll('#itemsTabla tr').length === 0) {
+            agregarFila();
+        }
+    });
+
+    function detectarDiaYTurno() {
+        const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const hoy = new Date();
+        const diaNombre = dias[hoy.getDay()];
+        const hora = hoy.getHours();
+        
+        document.getElementById('lblDiaActual').innerText = diaNombre;
+        let turnoSugerido = (hora >= 17) ? 'Noche' : 'Mañana';
+        document.getElementById('selectTurnoActual').value = turnoSugerido;
+    }
+
+    // Descargar plantilla vertical COMPLETA (Lunes a Domingo)
+    function descargarPlantillaVertical() {
+        let wb = XLSX.utils.book_new();
+        let wsData = [
+            ["Lunes Mañana", "Precio L.M.", "Lunes Noche", "Precio L.N.", "Martes Mañana", "Precio M.M.", "Martes Noche", "Precio M.N.", "Miércoles Mañana", "Precio Mi.M.", "Miércoles Noche", "Precio Mi.N.", "Jueves Mañana", "Precio J.M.", "Jueves Noche", "Precio J.N.", "Viernes Mañana", "Precio V.M.", "Viernes Noche", "Precio V.N.", "Sábado Mañana", "Precio S.M.", "Sábado Noche", "Precio S.N.", "Domingo Mañana", "Precio D.M.", "Domingo Noche", "Precio D.N.", "Promos", "Precio Promo", "Salsas y Adicionales", "Precio Adicional", "Bebidas", "Precio Bebida"],
+            ["Milanesa c/ Guarnición", 13200, "Pizza Muzza", 9000, "Milanesa a la Suiza", 14500, "Tartas", 7500, "Suprema", 13000, "Empanadas", 11000, "Guiso", 12000, "Pizzetas", 8000, "Napolitana", 15500, "Lomitos", 14500, "Asado", 16000, "Picadas", 12000, "Locro", 17000, "Minutas", 9000, "Promo Familiar", 22000, "Salsa Roja", 0, "Gaseosa 1.5L", 3000],
+            ["Pollo al Horno", 15000, "Lomo Completo", 14000, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Docena Empanadas", 11000, "Salsa Mixta", 0, "Cerveza 1L", 3500],
+            ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Papas Fritas Extra", 2500, "Agua Saborizada", 2000]
+        ];
+        let ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "MenuWaykiCompleto");
+        XLSX.writeFile(wb, "Plantilla_Semanal_Lunes_Domingo.xlsx");
+    }
+
+    function cargarExcelVertical(event) {
+        let file = event.target.files[0];
+        if (!file) return;
+
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                let data = new Uint8Array(e.target.result);
+                let workbook = XLSX.read(data, {type: 'array'});
+                let firstSheet = workbook.SheetNames[0];
+                let json = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {header: 1});
+                
+                menuVerticalExcel = json;
+                localStorage.setItem('wayki_menu_vertical', JSON.stringify(menuVerticalExcel));
+                document.getElementById('estadoExcel').innerText = "✅ Menú semanal cargado con éxito.";
+                alert('¡Menú de Lunes a Domingo cargado correctamente!');
+                renderDatalistProductos();
+            } catch (err) {
+                alert('Error al leer el archivo Excel.');
+                console.error(err);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function obtenerListasActuales() {
+        let dia = document.getElementById('lblDiaActual').innerText.toLowerCase();
+        let turno = document.getElementById('selectTurnoActual').value.toLowerCase();
+
+        let platos = [];
+        let promos = [];
+        let salsas = [];
+        let bebidas = [];
+
+        if (!menuVerticalExcel || menuVerticalExcel.length < 2) {
+            return {
+                platos: [{nombre: 'Milanesa c/ Guarnición', precio: 13200}, {nombre: 'Pollo al Horno', precio: 15000}],
+                promos: [{nombre: 'Promo Familiar', precio: 22000}],
+                salsas: [{nombre: 'Salsa Roja', precio: 0}, {nombre: 'Salsa Mixta', precio: 0}, {nombre: 'Puré', precio: 0}, {nombre: 'Papas Fritas Extra', precio: 2500}],
+                bebidas: [{nombre: 'Gaseosa 1.5L', precio: 3000}]
+            };
+        }
+
+        let headers = menuVerticalExcel[0].map(h => h ? h.toString().toLowerCase() : '');
+        let colIndexPlatosName = -1;
+        let colIndexPlatosPrice = -1;
+
+        headers.forEach((h, idx) => {
+            if (h.includes(dia) && h.includes(turno)) {
+                colIndexPlatosName = idx;
+                colIndexPlatosPrice = idx + 1;
+            }
+        });
+
+        if (colIndexPlatosName === -1 && headers.length > 0) {
+            colIndexPlatosName = 0;
+            colIndexPlatosPrice = 1;
+        }
+
+        for (let i = 1; i < menuVerticalExcel.length; i++) {
+            let row = menuVerticalExcel[i];
+            if (colIndexPlatosName !== -1 && row[colIndexPlatosName]) {
+                platos.push({ nombre: row[colIndexPlatosName], precio: parseFloat(row[colIndexPlatosPrice]) || 0 });
+            }
+            // Promos (columna 28 y 29 aprox en plantilla completa)
+            let promoIdx = headers.findIndex(h => h.includes('promo'));
+            if (promoIdx !== -1 && row[promoIdx]) {
+                promos.push({ nombre: row[promoIdx], precio: parseFloat(row[promoIdx+1]) || 0 });
+            }
+            // Salsas / Adicionales
+            let salsaIdx = headers.findIndex(h => h.includes('salsa') || h.includes('adicional'));
+            if (salsaIdx !== -1 && row[salsaIdx]) {
+                salsas.push({ nombre: row[salsaIdx], precio: parseFloat(row[salsaIdx+1]) || 0 });
+            }
+            // Bebidas
+            let bebidaIdx = headers.findIndex(h => h.includes('bebida'));
+            if (bebidaIdx !== -1 && row[bebidaIdx]) {
+                bebidas.push({ nombre: row[bebidaIdx], precio: parseFloat(row[bebidaIdx+1]) || 0 });
+            }
+        }
+
+        // Fallback si no encuentra por cabecera exacta
+        if (salsas.length === 0) salsas = [{nombre: 'Salsa Roja', precio: 0}, {nombre: 'Salsa Mixta', precio: 0}, {nombre: 'Puré', precio: 0}, {nombre: 'Papas Fritas Extra', precio: 2500}];
+        if (promos.length === 0) promos = [{nombre: 'Promo Familiar', precio: 22000}];
+
+        return { platos, promos, salsas, bebidas };
+    }
+
+    function renderDatalistProductos() {
+        let datos = obtenerListasActuales();
+        
+        document.querySelectorAll('.lista-productos-datalist').forEach(dl => {
+            let html = '';
+            datos.platos.concat(datos.promos, datos.bebidas).forEach(p => {
+                html += `<option value="${p.nombre}" data-precio="${p.precio}">`;
+            });
+            dl.innerHTML = html;
+        });
+
+        // Actualizar selects de guarniciones/salsas y permitir escritura libre o selección de Excel
+        document.querySelectorAll('.item-guarnicion').forEach(selectElem => {
+            let valorActual = selectElem.value;
+            let htmlOpts = `<option value="Sin guarnición/salsa">Sin guarnición / salsa</option>`;
+            
+            datos.salsas.forEach(s => {
+                // Si el precio es 0, no muestra recargo. Si tiene precio, muestra (+$X)
+                let etiqueta = s.precio > 0 ? `${s.nombre} (+$${s.precio})` : `${s.nombre} (S/C)`;
+                htmlOpts += `<option value="${etiqueta}">${etiqueta}</option>`;
+            });
+            
+            htmlOpts += `<option value="OTRA (Escribir en obs)">✏️ OTRA (Escribir libre en obs)</option>`;
+            selectElem.innerHTML = htmlOpts;
+            selectElem.value = valorActual;
+        });
+    }
+
+    function calcularVuelto() {
+        let total = parseFloat(document.getElementById('lblTotal').innerText) || 0;
+        let pagaCon = parseFloat(document.getElementById('montoPagaCon').value) || 0;
+        let vuelto = pagaCon - total;
+        document.getElementById('lblVuelto').innerText = vuelto >= 0 ? '$' + vuelto : '$0';
+    }
+
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'F12') {
+            e.preventDefault();
+            window.open(window.location.href, '_blank');
+        }
+    });
+
+    function actualizarTituloDinamico() {
+        let nombre = document.getElementById('clienteNombre').value.trim();
+        let textoTitulo = editandoId ? `WAYKI - Pedido #${editandoId}${nombre ? ': ' + nombre : ''}` : `WAYKI - Caja POS${nombre ? ': ' + nombre : ' (Nuevo Pedido)'}`;
+        document.getElementById('tituloCaja').innerText = textoTitulo;
+        document.getElementById('tituloPestana').innerText = textoTitulo;
+    }
+
+    function setTipoPedido(tipo) {
+        tipoPedidoActual = tipo;
+        document.getElementById('btnDelivery').className = tipo === 'Delivery' ? 'toggle-btn active' : 'toggle-btn';
+        document.getElementById('btnMostrador').className = tipo === 'Mostrador' ? 'toggle-btn active' : 'toggle-btn';
+    }
+
+    function setPago(pago) {
+        medioPagoActual = pago;
+        document.getElementById('btnEfectivo').className = 'toggle-btn active-blue';
+        document.getElementById('btnTransferencia').className = 'toggle-btn';
+    }
+
+    function setTransferencia(pago) {
+        medioPagoActual = pago;
+        document.getElementById('btnTransferencia').className = 'toggle-btn active-blue';
+        document.getElementById('btnEfectivo').className = 'toggle-btn';
+        document.getElementById('estadoPago').value = 'PAGADO / TRANSFERENCIA OK';
+    }
+
+    function verificarGuarnicion(selectElem) {
+        let fila = selectElem.closest('tr');
+        let inputPrecioGuarn = fila.querySelector('.item-guarnicion-precio');
+        let textoSel = selectElem.value;
+        
+        if (textoSel.includes('(+$')) {
+            inputPrecioGuarn.style.display = 'block';
+            let match = textoSel.match(/\(+\$(\d+)\)/);
+            if (match && match[1]) inputPrecioGuarn.value = match[1];
+        } else {
+            // Si es S/C o $0, se oculta y queda en 0
+            inputPrecioGuarn.style.display = 'none';
+            inputPrecioGuarn.value = '';
+        }
+        calcularTotal();
+    }
+
+    function seleccionarProducto(inputElem) {
+        let nombreIngresado = inputElem.value;
+        let fila = inputElem.closest('tr');
+        let inputPrecio = fila.querySelector('.item-precio');
+        
+        let datos = obtenerListasActuales();
+        let todos = datos.platos.concat(datos.promos, datos.bebidas);
+        let encontrado = todos.find(p => p.nombre.toLowerCase() === nombreIngresado.toLowerCase());
+        
+        if (encontrado) {
+            inputPrecio.value = encontrado.precio;
+        }
+        calcularTotal();
+    }
+
+    function agregarFila(itemData = null) {
+        let tbody = document.getElementById('itemsTabla');
+        let tr = document.createElement('tr');
+        
+        let cant = itemData ? itemData.cantidad : 1;
+        let nombre = itemData ? itemData.nombre : '';
+        let precio = itemData ? itemData.precio : '';
+        let guarnicion = itemData ? itemData.guarnicion : 'Sin guarnición/salsa';
+        let precioGuarn = (itemData && itemData.precioGuarnicion > 0) ? itemData.precioGuarnicion : '';
+        let displayGuarnInput = (itemData && itemData.precioGuarnicion > 0) ? 'block' : 'none';
+        let obsExtra = itemData ? itemData.obsExtra : '';
+
+        let datalistId = 'dl_' + Math.random().toString(36).substr(2, 9);
+        let datos = obtenerListasActuales();
+        let optionsHtml = '';
+        datos.platos.concat(datos.promos, datos.bebidas).forEach(p => {
+            optionsHtml += `<option value="${p.nombre}" data-precio="${p.precio}">`;
+        });
+
+        let optionsGuarn = `<option value="Sin guarnición/salsa">Sin guarnición / salsa</option>`;
+        datos.salsas.forEach(s => {
+            let etiqueta = s.precio > 0 ? `${s.nombre} (+$${s.precio})` : `${s.nombre} (S/C)`;
+            optionsGuarn += `<option value="${etiqueta}" ${guarnicion===etiqueta?'selected':''}>${etiqueta}</option>`;
+        });
+        optionsGuarn += `<option value="OTRA (Escribir en obs)">✏️ OTRA (Escribir libre en obs)</option>`;
+
+        tr.innerHTML = `
+            <td><input type="number" value="${cant}" min="1" class="item-cant" style="width:100%" oninput="calcularTotal()"></td>
+            <td>
+                <input type="text" list="${datalistId}" value="${nombre}" placeholder="🔍 Buscá plato o escribí..." class="item-nombre" style="width:100%" oninput="seleccionarProducto(this)">
+                <datalist id="${datalistId}" class="lista-productos-datalist">${optionsHtml}</datalist>
+            </td>
+            <td><input type="number" value="${precio}" placeholder="0" class="item-precio" style="width:100%" oninput="calcularTotal()"></td>
+            <td>
+                <select class="item-guarnicion" onchange="verificarGuarnicion(this)" style="margin-bottom: 4px; font-size: 12px;">${optionsGuarn}</select>
+                <input type="number" value="${precioGuarn}" placeholder="Precio extra" class="item-guarnicion-precio" style="display:${displayGuarnInput}; font-size:11px; margin-bottom: 4px;" oninput="calcularTotal()">
+                <input type="text" value="${obsExtra}" placeholder="Aclaración libre (ej: Vegano, Sin TACC...)" class="item-obs-extra" style="font-size:11px;">
+            </td>
+            <td><button class="btn btn-danger" onclick="eliminarFila(this)">X</button></td>
+        `;
+        tbody.appendChild(tr);
+        renderDatalistProductos();
+        calcularTotal();
+    }
+
+    function agregarPromoRapida() {
+        let datos = obtenerListasActuales();
+        let promo = datos.promos[0] || datos.platos[0];
+        agregarFila({cantidad: 1, nombre: promo ? promo.nombre : 'Promo', precio: promo ? promo.precio : 0, guarnicion: 'Sin guarnición/salsa', precioGuarnicion: 0, obsExtra: ''});
+    }
+
+    function eliminarFila(btn) {
+        let row = btn.parentNode.parentNode;
+        if(document.querySelectorAll('#itemsTabla tr').length > 1) {
+            row.remove();
+            calcularTotal();
+        }
+    }
+
+    function calcularTotal() {
+        let total = 0;
+        let cants = document.querySelectorAll('.item-cant');
+        let precios = document.querySelectorAll('.item-precio');
+        let preciosGuarn = document.querySelectorAll('.item-guarnicion-precio');
+
+        for(let i=0; i<cants.length; i++) {
+            let c = parseFloat(cants[i].value) || 0;
+            let p = parseFloat(precios[i].value) || 0;
+            let pg = parseFloat(preciosGuarn[i].value) || 0;
+            total += c * (p + pg);
+        }
+        document.getElementById('lblTotal').innerText = total;
+        calcularVuelto();
+    }
+
+    function cerrarVenta() {
+        let nombre = document.getElementById('clienteNombre').value || 'Consumidor Final';
+        let cel = document.getElementById('clienteCel').value || '';
+        let dir = document.getElementById('clienteDireccion').value || 'En Local';
+        let obs = document.getElementById('observaciones').value;
+        let estadoPago = document.getElementById('estadoPago').value;
+        let dineroRecibido = document.getElementById('checkDineroRecibido').checked;
+        let total = document.getElementById('lblTotal').innerText;
+        let pagaCon = document.getElementById('montoPagaCon').value;
+        let vueltoCalc = (parseFloat(pagaCon) || 0) - (parseFloat(total) || 0);
+
+        let items = [];
+        let cants = document.querySelectorAll('.item-cant');
+        let nombres = document.querySelectorAll('.item-nombre');
+        let precios = document.querySelectorAll('.item-precio');
+        let guarniciones = document.querySelectorAll('.item-guarnicion');
+        let preciosGuarn = document.querySelectorAll('.item-guarnicion-precio');
+        let obsExtras = document.querySelectorAll('.item-obs-extra');
+
+        for(let i=0; i<cants.length; i++) {
+            if(nombres[i].value.trim() !== '') {
+                let pgVal = parseFloat(preciosGuarn[i].value) || 0;
+                items.push({
+                    cantidad: cants[i].value,
+                    nombre: nombres[i].value,
+                    precio: precios[i].value,
+                    guarnicion: guarniciones[i].value,
+                    precioGuarnicion: pgVal,
+                    obsExtra: obsExtras[i].value
+                });
+            }
+        }
+
+        if(items.length === 0) {
+            alert('Agregue al menos un ítem al pedido.');
+            return;
+        }
+
+        let numeroPedido = editandoId ? editandoId : Math.floor(1000 + Math.random() * 9000);
+        let hoyFechaYyyyMmDd = new Date().toISOString().slice(0, 10);
+
+        let ventasAnteriores = JSON.parse(localStorage.getItem('wayki_ventas')) || [];
+        let ventaAntigua = ventasAnteriores.find(v => v.id == numeroPedido);
+        let cocinaListo = ventaAntigua ? ventaAntigua.cocinaListo : false;
+
+        let venta = {
+            id: numeroPedido,
+            fechaYyyyMmDd: hoyFechaYyyyMmDd,
+            fechaTexto: new Date().toLocaleDateString(),
+            hora: ventaAntigua ? ventaAntigua.hora : new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            nombre, cel, dir, tipo: tipoPedidoActual, medioPago: medioPagoActual, estadoPago, dineroRecibido, 
+            pagaCon: pagaCon ? parseFloat(pagaCon) : 0,
+            vuelto: vueltoCalc > 0 ? vueltoCalc : 0,
+            obs, items, total: parseFloat(total), cocinaListo, modificado: editandoId ? true : false
+        };
+
+        let cocina = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
+
+        if (editandoId) {
+            ventasHoy = ventasHoy.map(v => v.id == editandoId ? venta : v);
+            let indexCocina = cocina.findIndex(p => p.id == editandoId);
+            if (indexCocina !== -1) cocina[indexCocina] = venta;
+            else cocina.push(venta);
+            localStorage.setItem('wayki_cocina', JSON.stringify(cocina));
+
+            editandoId = null;
+            document.getElementById('tituloCaja').innerText = "Caja POS";
+            document.getElementById('tituloPestana').innerText = "WAYKI - Caja POS";
+            document.getElementById('btnAccionVenta').innerText = "🖨️ Cerrar Venta, Imprimir y Enviar a Cocina";
+            document.getElementById('btnCancelarEdicion').style.display = 'none';
+            alert('¡Modificación guardada e impresa!');
+        } else {
+            cocina.push(venta);
+            localStorage.setItem('wayki_cocina', JSON.stringify(cocina));
+            ventasHoy.push(venta);
+            alert('¡Pedido registrado, enviado a cocina e impreso!');
+        }
+
+        localStorage.setItem('wayki_ventas', JSON.stringify(ventasHoy));
+        imprimirTicket(venta);
+        renderVentas();
+        limpiarFormularioDatos();
+    }
+
+    function limpiarFormularioDatos() {
+        document.getElementById('clienteNombre').value = '';
+        document.getElementById('clienteCel').value = '';
+        document.getElementById('clienteDireccion').value = '';
+        document.getElementById('observaciones').value = '';
+        document.getElementById('montoPagaCon').value = '';
+        document.getElementById('lblVuelto').innerText = '$0';
+        document.getElementById('checkDineroRecibido').checked = false;
+        document.getElementById('itemsTabla').innerHTML = '';
+        agregarFila();
+        calcularTotal();
+        actualizarTituloDinamico();
+    }
+
+    function limpiarFormulario() {
+        editandoId = null;
+        document.getElementById('btnAccionVenta').innerText = "🖨️ Cerrar Venta, Imprimir y Enviar a Cocina";
+        document.getElementById('btnCancelarEdicion').style.display = 'none';
+        limpiarFormularioDatos();
+    }
+
+    function repetirPedidoAnterior(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if (!v) return;
+
+        document.getElementById('clienteNombre').value = v.nombre || '';
+        document.getElementById('clienteCel').value = v.cel || '';
+        document.getElementById('clienteDireccion').value = v.dir || '';
+        setTipoPedido(v.tipo || 'Delivery');
+
+        let tbody = document.getElementById('itemsTabla');
+        tbody.innerHTML = '';
+        if (v.items && v.items.length > 0) {
+            v.items.forEach(it => agregarFila(it));
+        } else {
+            agregarFila();
+        }
+        calcularTotal();
+        alert(`¡Pedido #${id} cargado para repetir rápido!`);
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function reabrirPedido(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if (!v) return;
+
+        editandoId = v.id;
+        document.getElementById('btnAccionVenta').innerText = "💾 Guardar Cambios y Actualizar Cocina";
+        document.getElementById('btnCancelarEdicion').style.display = 'block';
+
+        document.getElementById('clienteNombre').value = v.nombre || '';
+        document.getElementById('clienteCel').value = v.cel || '';
+        document.getElementById('clienteDireccion').value = v.dir || '';
+        document.getElementById('observaciones').value = v.obs || '';
+        document.getElementById('estadoPago').value = v.estadoPago || '';
+        document.getElementById('checkDineroRecibido').checked = v.dineroRecibido || false;
+        if (v.pagaCon) document.getElementById('montoPagaCon').value = v.pagaCon;
+
+        setTipoPedido(v.tipo || 'Delivery');
+        if (v.medioPago === 'Efectivo') setPago('Efectivo');
+        else setTransferencia('Transferencia');
+
+        let tbody = document.getElementById('itemsTabla');
+        tbody.innerHTML = '';
+        if (v.items && v.items.length > 0) {
+            v.items.forEach(it => agregarFila(it));
+        } else {
+            agregarFila();
+        }
+        actualizarTituloDinamico();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function toggleRecibidoRapido(id) {
+        ventasHoy = ventasHoy.map(v => {
+            if (v.id == id) v.dineroRecibido = !v.dineroRecibido;
+            return v;
+        });
+        localStorage.setItem('wayki_ventas', JSON.stringify(ventasHoy));
+        renderVentas();
+    }
+
+    function abrirWspApp(idPedido, nombre, cel) {
+        if(!cel) { alert('El cliente no tiene celular cargado.'); return; }
+        let numeroLimpio = cel.replace(/\D/g,'');
+        let mensaje = `¡Hola ${nombre || 'Cliente'}! Somos de Wayki Casa de Comidas. Su pedido N° #${idPedido} ya está en camino 🛵💨. ¡Gracias por su compra!`;
+        window.location.href = `whatsapp://send?phone=549${numeroLimpio}&text=${encodeURIComponent(mensaje)}`;
+    }
+
+    function enviarWspActual() {
+        let nombre = document.getElementById('clienteNombre').value || 'Cliente';
+        let cel = document.getElementById('clienteCel').value;
+        abrirWspApp(editandoId || '---', nombre, cel);
+    }
+
+    function imprimirTicket(v) {
+        document.getElementById('t-nro').innerText = v.id;
+        document.getElementById('t-fecha').innerText = v.hora;
+        document.getElementById('t-tipo').innerText = v.tipo.toUpperCase();
+        document.getElementById('t-cliente').innerText = v.nombre;
+        document.getElementById('t-tel').innerText = v.cel;
+        document.getElementById('t-dir').innerText = v.dir;
+        document.getElementById('t-obs').innerText = v.obs;
+        document.getElementById('t-pago').innerText = `${v.medioPago} - ${v.estadoPago} ${v.dineroRecibido ? '[DINERO RECIBIDO ✅]' : ''}`;
+        document.getElementById('t-total').innerText = v.total;
+
+        if (v.pagaCon && v.pagaCon > 0) {
+            document.getElementById('t-pagan').innerText = v.pagaCon;
+            document.getElementById('t-vuelton').innerText = '$' + (v.vuelto || 0);
+            document.getElementById('t-vuelto-box').style.display = 'block';
+        } else {
+            document.getElementById('t-vuelto-box').style.display = 'none';
+        }
+
+        let htmlItems = '';
+        v.items.forEach(it => {
+            let detalleGuarnicion = it.guarnicion !== 'Sin guarnición/salsa' ? `<br>&nbsp;&nbsp;↳ [${it.guarnicion}]` : '';
+            let precioGuarnTxt = it.precioGuarnicion > 0 ? ` (+$${it.precioGuarnicion})` : '';
+            let detalleExtra = it.obsExtra ? `<br>&nbsp;&nbsp;↳ Obs: ${it.obsExtra}` : '';
+            let subtotalItem = it.cantidad * (parseFloat(it.precio) + parseFloat(it.precioGuarnicion));
+            htmlItems += `<div style="margin-bottom: 10px;"><b>${it.cantidad}x</b> ${it.nombre}${precioGuarnTxt} <b>($${subtotalItem})</b>${detalleGuarnicion}${detalleExtra}</div>`;
+        });
+        document.getElementById('t-items').innerHTML = htmlItems;
+
+        document.getElementById('ticket-impresion').style.display = 'block';
+        window.print();
+        document.getElementById('ticket-impresion').style.display = 'none';
+    }
+
+    function reimprimirTicketPorId(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if(v) imprimirTicket(v);
+        else alert('No se encontró el pedido.');
+    }
+
+    function renderVentas() {
+        let contenedor = document.getElementById('listaVentas');
+        if(ventasHoy.length === 0) {
+            contenedor.innerHTML = '<p style="color: #7f8c8d; font-size: 13px;">No hay ventas registradas todavía.</p>';
+            return;
+        }
+        let html = '';
+        ventasHoy.slice().reverse().forEach(v => {
+            let claseEstado = '';
+            let etiquetaEstado = 'Pendiente en Cocina ⏳';
+            if (v.dineroRecibido) { claseEstado = 'estado-cobrado'; etiquetaEstado = 'Cobrado ✅'; } 
+            else if (v.cocinaListo) { claseEstado = 'estado-cocina'; etiquetaEstado = '¡Listo en Cocina! 🔔'; }
+
+            html += `
+                <div class="sale-item ${claseEstado}">
+                    <div style="display: flex; justify-content: space-between;">
+                        <b>#${v.id} - ${v.hora} - ${v.nombre} (${v.tipo})</b>
+                        <span style="font-weight: bold; color: #2c3e50;">${etiquetaEstado}</span>
+                    </div>
+                    <span>Total: <b>$${v.total}</b> | Pago: ${v.medioPago} ${v.vuelto > 0 ? '| Vuelto: <b>$' + v.vuelto + '</b>' : ''}</span><br>
+                    <div style="margin-top:6px; display:flex; gap:5px; flex-wrap:wrap; align-items: center;">
+                        <button class="btn-danger" onclick="anularVenta(${v.id})">❌ Anular</button>
+                        <button class="btn-print" onclick="reimprimirTicketPorId(${v.id})">🖨️ Re-imprimir</button>
+                        <button class="btn-print" style="background: #27ae60;" onclick="repetirPedidoAnterior(${v.id})">🔄 Repetir</button>
+                        <button class="btn-print" style="background: #8e44ad;" onclick="reabrirPedido(${v.id})">📂 Ver/Editar</button>
+                        <button class="btn-print" style="background: ${v.dineroRecibido ? '#c0392b' : '#2980b9'};" onclick="toggleRecibidoRapido(${v.id})">${v.dineroRecibido ? '🔄 Desmarcar' : '💵 Cobrar'}</button>
+                        ${v.cel ? `<button class="btn-whatsapp" style="margin-top:0; width:auto; padding:4px 8px; font-size:12px;" onclick="abrirWspApp('${v.id}', '${v.nombre}', '${v.cel}')">💬 WSP</button>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        contenedor.innerHTML = html;
+    }
+
+    function anularVenta(id) {
+        if(confirm('¿Seguro querés anular este pedido?')) {
+            ventasHoy = ventasHoy.filter(v => v.id != id);
+            localStorage.setItem('wayki_ventas', JSON.stringify(ventasHoy));
+            let cocina = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
+            cocina = cocina.filter(v => v.id != id);
+            localStorage.setItem('wayki_cocina', JSON.stringify(cocina));
+            renderVentas();
+        }
+    }
+
+    function abrirReportes() {
+        let hoyStr = new Date().toISOString().slice(0, 10);
+        document.getElementById('fechaDesde').value = hoyStr;
+        document.getElementById('fechaHasta').value = hoyStr;
+        document.getElementById('modalReportes').style.display = 'flex';
+        calcularReporteRango();
+    }
+
+    function cerrarReportes() { document.getElementById('modalReportes').style.display = 'none'; }
+
+    function calcularReporteRango() {
+        let desde = document.getElementById('fechaDesde').value;
+        let hasta = document.getElementById('fechaHasta').value;
+        let ventasTotales = JSON.parse(localStorage.getItem('wayki_ventas')) || [];
+        let efectivo = 0, transferencia = 0;
+
+        ventasTotales.forEach(v => {
+            let fechaVenta = v.fechaYyyyMmDd || '';
+            if (fechaVenta >= desde && fechaVenta <= hasta) {
+                if (v.medioPago === 'Efectivo') efectivo += parseFloat(v.total) || 0;
+                else transferencia += parseFloat(v.total) || 0;
+            }
+        });
+        document.getElementById('repEfectivo').innerText = '$' + efectivo;
+        document.getElementById('repTransf').innerText = '$' + transferencia;
+        document.getElementById('repTotal').innerText = '$' + (efectivo + transferencia);
+    }
+
+    function exportarExcel() {
+        if(ventasHoy.length === 0) { alert('No hay ventas.'); return; }
+        let csv = 'ID;Fecha;Hora;Cliente;Celular;Direccion;Tipo;MedioPago;Total\n';
+        ventasHoy.forEach(v => {
+            csv += `${v.id};${v.fechaTexto || ''};${v.hora};${v.nombre};${v.cel};${v.dir};${v.tipo};${v.medioPago};${v.total}\n`;
+        });
+        let blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        let a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Ventas_Wayki_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+    }
+
+    function reproducirPitido() {
+        try {
+            let ctx = new (window.AudioContext || window.webkitAudioContext)();
+            let osc = ctx.createOscillator();
+            let gain = ctx.createGain();
+            osc.frequency.value = 850;
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); setTimeout(() => osc.stop(), 500);
+        } catch(e) {}
+    }
+
+    setInterval(() => {
+        let listos = JSON.parse(localStorage.getItem('wayki_listos')) || [];
+        if(listos.length > 0) {
+            let idListo = listos.shift();
+            localStorage.setItem('wayki_listos', JSON.stringify(listos));
+            ventasHoy = ventasHoy.map(v => { if (v.id == idListo) v.cocinaListo = true; return v; });
+            localStorage.setItem('wayki_ventas', JSON.stringify(ventasHoy));
+            renderVentas();
+            reproducirPitido();
+        }
+    }, 1500);
+
+    renderVentas();
+</script>
+
+</body>
+</html>
