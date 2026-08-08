@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WAYKI - Pantalla de Cocina</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
         :root { --bg: #222; --card: #fff; --text: #333; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: var(--text); }
@@ -40,14 +43,38 @@
     <div class="kds-grid" id="tablero"></div>
 
     <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEuKDbrqXTfMM7Z6PLpTB6TsVCvvHWq_o",
+            authDomain: "wayki-cocina.firebaseapp.com",
+            projectId: "wayki-cocina",
+            storageBucket: "wayki-cocina.firebasestorage.app",
+            messagingSenderId: "750389109772",
+            appId: "1:750389109772:web:b8d290bf5dbc1fd339fa29"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
         setInterval(() => {
             document.getElementById('reloj').innerText = new Date().toLocaleTimeString('es-AR');
         }, 1000);
 
-        function cargarPedidos() {
-            let pedidos = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
+        // Escuchar cambios en tiempo real desde Firebase
+        db.ref('wayki_cocina').on('value', (snapshot) => {
+            let data = snapshot.val();
+            let pedidos = [];
+            if (data) {
+                if (Array.isArray(data)) {
+                    pedidos = data.filter(p => p !== null);
+                } else {
+                    pedidos = Object.values(data);
+                }
+            }
+            renderTablero(pedidos);
+        });
+
+        function renderTablero(pedidos) {
             const tablero = document.getElementById('tablero');
-            
             const aMostrar = pedidos.slice(0, 7);
             const enEspera = pedidos.length > 7 ? pedidos.length - 7 : 0;
             
@@ -67,18 +94,20 @@
 
             aMostrar.forEach(p => {
                 let itemsHtml = '';
-                p.items.forEach(i => {
-                    let detalleGuarnicion = (i.guarnicion && i.guarnicion !== 'Sin guarnición') ? `<div class="guarnicion">↳ ${i.guarnicion}</div>` : '';
-                    let detalleExtra = i.obsExtra ? `<div class="observacion">⚠️ ${i.obsExtra}</div>` : '';
+                if(p.items) {
+                    p.items.forEach(i => {
+                        let detalleGuarnicion = (i.guarnicion && i.guarnicion !== 'Sin guarnición') ? `<div class="guarnicion">↳ ${i.guarnicion}</div>` : '';
+                        let detalleExtra = i.obsExtra ? `<div class="observacion">⚠️ ${i.obsExtra}</div>` : '';
 
-                    itemsHtml += `
-                        <div class="item-row">
-                            <strong>${i.cantidad}x ${i.nombre}</strong><br>
-                            ${detalleGuarnicion}
-                            ${detalleExtra}
-                        </div>
-                    `;
-                });
+                        itemsHtml += `
+                            <div class="item-row">
+                                <strong>${i.cantidad}x ${i.nombre}</strong><br>
+                                ${detalleGuarnicion}
+                                ${detalleExtra}
+                            </div>
+                        `;
+                    });
+                }
 
                 let obsGeneral = p.obs ? `<div class="obs-general">Nota: ${p.obs}</div>` : '';
                 let tipoPedido = p.tipo ? p.tipo : 'Mostrador';
@@ -106,21 +135,26 @@
         }
 
         function marcarListo(id) {
-            // 1. Borrar de la pantalla de cocina
-            let pedidos = JSON.parse(localStorage.getItem('wayki_cocina')) || [];
-            pedidos = pedidos.filter(p => String(p.id) !== String(id));
-            localStorage.setItem('wayki_cocina', JSON.stringify(pedidos));
+            db.ref('wayki_cocina').once('value', (snapshot) => {
+                let data = snapshot.val();
+                let pedidos = [];
+                if (data) {
+                    pedidos = Array.isArray(data) ? data.filter(p => p !== null) : Object.values(data);
+                }
+                
+                // Filtrar el pedido que se despacha
+                pedidos = pedidos.filter(p => String(p.id) !== String(id));
+                db.ref('wayki_cocina').set(pedidos);
 
-            // 2. Avisarle a la caja que está listo para que salte la notificación en la PC
-            let listos = JSON.parse(localStorage.getItem('wayki_listos')) || [];
-            listos.push(id);
-            localStorage.setItem('wayki_listos', JSON.stringify(listos));
-
-            cargarPedidos(); 
+                // Avisarle a la caja que está listo
+                db.ref('wayki_listos').once('value', (snapListos) => {
+                    let listos = snapListos.val() || [];
+                    if (!Array.isArray(listos)) listos = Object.values(listos);
+                    listos.push(id);
+                    db.ref('wayki_listos').set(listos);
+                });
+            });
         }
-
-        setInterval(cargarPedidos, 2000);
-        cargarPedidos();
     </script>
 </body>
 </html>
