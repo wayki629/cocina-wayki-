@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAYKI - Casa de Comidas</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --primary-color: #6a0d1b;
+            --accent-color: #d97706;
+            --bg-body: #fef3c7;
+            --border-color: #e2e8f0;
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: var(--bg-body); margin: 0; padding: 0; color: #1e293b; }
+
+        header { background: white; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid var(--primary-color); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .logo-container img { height: 60px; object-fit: contain; }
+        .estado-tienda { font-weight: bold; font-size: 14px; padding: 8px 16px; border-radius: 20px; }
+        .abierto { background: #d1fae5; color: #065f46; }
+        .cerrado { background: #fee2e2; color: #991b1b; }
+
+        #bannerAnuncio { text-align: center; padding: 15px; font-weight: bold; font-size: 18px; display: none; background: #fffbeb; border-bottom: 2px solid #fde68a; }
+        
+        @keyframes latidoAnim {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+        @keyframes reboteAnim {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+        .efecto-latido { animation: latidoAnim 1.2s infinite ease-in-out; display: inline-block; }
+        .efecto-rebote { animation: reboteAnim 1s infinite alternate ease-in-out; display: inline-block; }
+
+        /* CARRUSEL AUTOMÁTICO ADAPTADO */
+        #seccionCarrusel { display: none; max-width: 600px; margin: 25px auto; padding: 0 20px; text-align: center; }
+        .carrusel-slide-container { position: relative; width: 100%; height: 280px; border-radius: 12px; overflow: hidden; border: 2px solid #cbd5e1; box-shadow: 0 4px 10px rgba(0,0,0,0.1); background: #ffffff; display: flex; align-items: center; justify-content: center; }
+        .carrusel-slide-img { width: 100%; height: 100%; object-fit: contain; object-position: center; display: none; animation: fadeIn 0.5s ease-in-out; background: #ffffff; padding: 6px; box-sizing: border-box; }
+        .carrusel-slide-img.activo { display: block; }
+        @keyframes fadeIn { from { opacity: 0.4; } to { opacity: 1; } }
+
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .titulo-seccion { color: var(--primary-color); font-size: 26px; font-weight: bold; margin-bottom: 5px; text-align: center; }
+        .subtitulo-seccion { text-align: center; color: #475569; font-size: 16px; margin-bottom: 25px; }
+
+        .grid-productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card-producto { background: white; border-radius: 12px; overflow: hidden; border: 2px solid #cbd5e1; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        .card-img-wrapper { width: 100%; height: 180px; background: #f8fafc; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #e2e8f0; }
+        .card-img-wrapper img { width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; padding: 4px; box-sizing: border-box; }
+
+        .card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        
+        .precio-final { color: #b45309; font-weight: bold; font-size: 22px; }
+        .btn-pedir { background: #16a34a; color: white; border: none; padding: 12px; width: 100%; font-weight: bold; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 15px; }
+        .btn-pedir:hover { background: #15803d; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: flex-end; }
+        .modal-content { background: white; width: 100%; max-width: 550px; max-height: 90vh; border-top-left-radius: 20px; border-top-right-radius: 20px; display: flex; flex-direction: column; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); animation: subirModal 0.3s ease-out; }
+        @keyframes subirModal { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .modal-header { padding: 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+
+        .opcion-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+        .contador-box { display: flex; align-items: center; gap: 10px; }
+        .btn-cnt { background: #e2e8f0; border: none; width: 30px; height: 30px; border-radius: 50%; font-weight: bold; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+        .btn-cnt:hover { background: #cbd5e1; }
+
+        .btn-accion { background: var(--primary-color); color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; text-align: center; }
+        .btn-accion:hover { background: #500a13; }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #334155; }
+        input, textarea, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }
+
+        .tipo-entrega-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .btn-tipo-entrega { border: 2px solid #cbd5e1; background: white; padding: 15px; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; text-align: center; }
+        .btn-tipo-entrega.seleccionado { border-color: var(--accent-color); background: #fffbeb; color: #b45309; }
+
+        .carrito-flotante { position: fixed; bottom: 25px; right: 25px; background: var(--primary-color); color: white; padding: 16px 28px; border-radius: 40px; font-weight: bold; font-size: 18px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.3); z-index: 1000; display: flex; align-items: center; gap: 10px; border: 2px solid white; }
+        .whatsapp-flotante { position: fixed; bottom: 25px; left: 25px; background: #25d366; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container" id="logoWebDiv">
+            <h1 style="margin:0; color:var(--primary-color); font-size: 28px;">WAYKI</h1>
+        </div>
+        <div>
+            <span id="badgeEstadoTienda" class="estado-tienda abierto">🟢 Abierto</span>
+        </div>
+    </header>
+
+    <div id="bannerAnuncio"></div>
+
+    <!-- CARRUSEL AUTOMÁTICO -->
+    <div id="seccionCarrusel">
+        <div class="carrusel-slide-container" id="contenedorCarruselWeb"></div>
+    </div>
+
+    <div class="container">
+        <h2 class="titulo-seccion" id="tituloDiaTurno">Menú de Hoy</h2>
+        <p class="subtitulo-seccion">Tocá cualquier plato para personalizarlo a tu gusto</p>
+        
+        <div id="grillaCatalogoCliente" class="grid-productos"></div>
+    </div>
+
+    <a id="btnWhatsappFlotante" href="https://wa.me/543812108471?text=Hola,%20tengo%20una%20consulta%20sobre%20mi%20pedido." target="_blank" class="whatsapp-flotante">💬</a>
+    
+    <div class="carrito-flotante" onclick="abrirCheckout()">
+        🛒 Ver Pedido (<span id="contadorCarrito">0</span>)
+    </div>
+
+    <!-- MODAL PERSONALIZAR -->
+    <div id="modalPersonalizar" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalNombrePlato" style="margin:0; font-size: 20px; color:#1e293b;">Personalizar Plato</h3>
+                <button onclick="cerrarModal('modalPersonalizar')" style="background:none; border:none; font-size: 22px; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-weight: bold; color: #475569; margin-bottom: 10px;">Adicionales o Acompañamientos:</p>
+                <div id="contenedorSalsasDinamicas"></div>
+            </div>
+            <div class="modal-footer">
+                <div>
+                    <span style="font-size: 12px; color: #64748b;">Total del plato:</span>
+                    <span id="modalPrecioTotal" style="font-size: 22px; font-weight: bold; color: #b45309;">$0</span>
+                </div>
+                <button class="btn-accion" style="width: auto; padding: 10px 20px; background: #eab308; color:#1e293b;" onclick="agregarAlCarritoFinal()">Guardar / Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHECKOUT -->
+    <div id="modalCheckout" class="modal-overlay">
+        <div class="modal-content" style="max-height: 95vh;">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 20px; color:#1e293b;">Finalizar Pedido</h3>
+                <button onclick="cerrarModal('modalCheckout')" style="background:none; border:none; font-size: 22px; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-weight: bold; margin-top:0;">¿Cómo querés recibir tu pedido?</p>
+                <div class="tipo-entrega-grid">
+                    <button class="btn-tipo-entrega seleccionado" id="btnRetirar" onclick="seleccionarEntrega('retirar')">🛍️ Retirar en Mostrador</button>
+                    <button class="btn-tipo-entrega" id="btnDelivery" onclick="seleccionarEntrega('delivery')">🛵 Envío a Domicilio</button>
+                </div>
+
+                <div class="form-group">
+                    <label>Tu Nombre:</label>
+                    <input type="text" id="checkoutNombre" placeholder="Ej: Juan Pérez">
+                </div>
+                <div class="form-group">
+                    <label>Número de Celular / WhatsApp:</label>
+                    <input type="tel" id="checkoutCel" placeholder="Ej: 3815000000">
+                </div>
+
+                <div id="camposDelivery" style="display: none;">
+                    <div class="form-group">
+                        <label>Dirección (Calle y Número):</label>
+                        <input type="text" id="checkoutDireccion" placeholder="Ej: Asunción 636">
+                    </div>
+                    <div class="form-group">
+                        <label>Aclaraciones (Ej: Toca timbre, al fondo):</label>
+                        <textarea id="checkoutAclaracion" rows="2" placeholder="Indicaciones para el delivery..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>¿A qué hora querés recibirlo? (Escribí o seleccioná):</label>
+                    <input type="text" id="checkoutHorarioProgramado" list="listaHorariosSugeridos" placeholder="Ej: Lo antes posible o 21:30 hs" style="font-weight: bold; color: #b45309; background: #fffbeb;">
+                    <datalist id="listaHorariosSugeridos">
+                        <option value="Lo antes posible">
+                        <option value="12:00 hs">
+                        <option value="12:30 hs">
+                        <option value="13:00 hs">
+                        <option value="13:30 hs">
+                        <option value="14:00 hs">
+                        <option value="20:30 hs">
+                        <option value="21:00 hs">
+                        <option value="21:30 hs">
+                        <option value="22:00 hs">
+                    </datalist>
+                </div>
+
+                <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                    <strong>Resumen del Carrito:</strong>
+                    <div id="resumenItemsCarrito" style="font-size: 14px; margin: 5px 0; color: #475569;"></div>
+                    <div style="font-size: 18px; font-weight: bold; color: #b45309; text-align: right; margin-top: 5px;">Total a Pagar: $<span id="checkoutTotalFinal">0</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-accion" onclick="avanzarAPago()">Continuar al Pago ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PAGO -->
+    <div id="modalPago" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0; font-size: 20px; color:#1e293b;">Seleccionar Medio de Pago</h3>
+                <button onclick="cerrarModal('modalPago')" style="background:none; border:none; font-size: 22px; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: #fffbeb; border: 2px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                    <span style="font-size: 12px; color: #78350f; font-weight: bold; display: block; margin-bottom: 4px;">DETALLE DE TU PEDIDO:</span>
+                    <div id="resumenPagoDetalle" style="font-size: 13px; color: #475569; margin-bottom: 8px;"></div>
+                    <hr style="border: 0; border-top: 1px dashed #f59e0b; margin: 6px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 14px; color: #78350f; font-weight: bold;">TOTAL A PAGAR:</span>
+                        <span id="pagoTotalPantalla" style="font-size: 22px; font-weight: bold; color: #b45309;">$0</span>
+                    </div>
+                </div>
+
+                <div class="form-group" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 8px;">
+                    <label style="color: #166534; margin-bottom: 5px;">🏷️ ¿Tenés un código de descuento o cupón?</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="inputCodigoCupon" placeholder="Ej: WAYKI10" style="text-transform: uppercase; font-weight: bold;">
+                        <button type="button" onclick="aplicarCuponWeb()" style="background: #16a34a; color: white; border: none; padding: 0 15px; border-radius: 6px; font-weight: bold; cursor: pointer;">Aplicar</button>
+                    </div>
+                    <div id="mensajeCuponFeedback" style="font-size: 13px; margin-top: 6px; font-weight: bold;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>¿Cómo abonás?</label>
+                    <select id="selectMedioPago" onchange="cambiarMetodoPago()">
+                        <option value="efectivo">💵 Efectivo</option>
+                        <option value="transferencia">📱 Transferencia / Mercado Pago</option>
+                    </select>
+                </div>
+
+                <div id="bloqueEfectivo" class="form-group">
+                    <label>¿Abonas con cuánto? (Para calcular el vuelto):</label>
+                    <input type="number" id="pagoConCuanto" placeholder="Ej: 40000">
+                    <small style="color: #64748b;">Dejar en blanco si abonás justo.</small>
+                </div>
+
+                <div id="bloqueTransferencia" class="form-group" style="display: none; background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <strong style="color: #1e40af; display: block; margin-bottom: 5px;">Datos para Transferir:</strong>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #93c5fd; margin-bottom: 8px;">
+                        <div>
+                            <span style="font-size: 11px; color: #64748b; display: block;">ALIAS:</span>
+                            <b id="textoAlias" style="color: #2563eb; font-size: 16px;">wayki.comidas.mp</b>
+                        </div>
+                        <button onclick="copiarAlias()" style="background: #2563eb; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;">📋 Copiar</button>
+                    </div>
+                    <p style="margin: 4px 0; font-size: 13px;">Titular: <b>Wayki Casa de Comidas</b></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-accion" onclick="enviarPedidoFinalFirebase()">🚀 Confirmar y Enviar Pedido</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEuKDbrqXTfMM7Z6PLpTB6TsVCvvHWq_o",
+            authDomain: "wayki-cocina.firebaseapp.com",
+            projectId: "wayki-cocina",
+            storageBucket: "wayki-cocina.firebasestorage.app",
+            messagingSenderId: "750389109772",
+            appId: "1:750389109772:web:b8d290bf5dbc1fd339fa29"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let datosWebGlobal = {};
+        let productoSeleccionadoActual = null;
+        let carritoCompras = [];
+        let tipoEntregaActual = 'retirar';
+        let cuponAplicadoGlobal = null; 
+        let intervaloCarrusel = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            db.ref('wayki_config_web').on('value', (snapshot) => {
+                let data = snapshot.val() || {};
+                datosWebGlobal = data;
+
+                let badge = document.getElementById('badgeEstadoTienda');
+                if(data.estado === 'cerrado') {
+                    badge.className = 'estado-tienda cerrado';
+                    badge.innerText = '🔴 Local Cerrado';
+                } else {
+                    badge.className = 'estado-tienda abierto';
+                    badge.innerText = '🟢 Abierto';
+                }
+
+                if(data.logoUrl) {
+                    document.getElementById('logoWebDiv').innerHTML = `<img src="${data.logoUrl}" alt="Logo Wayki">`;
+                }
+
+                if(data.aliasBancario) {
+                    document.getElementById('textoAlias').innerText = data.aliasBancario;
+                }
+
+                if(data.whatsappNegocio) {
+                    let numWsp = data.whatsappNegocio.replace(/\D/g, '');
+                    document.getElementById('btnWhatsappFlotante').href = `https://wa.me/${numWsp}?text=Hola,%20tengo%20una%20consulta%20sobre%20mi%20pedido.`;
+                }
+
+                let banner = document.getElementById('bannerAnuncio');
+                if(data.mensajeAnuncio && data.mensajeAnuncio.trim() !== "") {
+                    banner.style.display = 'block';
+                    let efecto = data.efectoAnuncio || 'estatico';
+                    if (efecto === 'marquesina') {
+                        banner.innerHTML = `<marquee scrollamount="5" style="font-size: 18px; font-weight: bold; color: #92400e;">${data.mensajeAnuncio}</marquee>`;
+                    } else if (efecto === 'latido') {
+                        banner.innerHTML = `<span class="efecto-latido" style="font-size: 18px; font-weight: bold; color: #92400e;">${data.mensajeAnuncio}</span>`;
+                    } else if (efecto === 'rebote') {
+                        banner.innerHTML = `<span class="efecto-rebote" style="font-size: 18px; font-weight: bold; color: #92400e;">${data.mensajeAnuncio}</span>`;
+                    } else {
+                        banner.innerHTML = `<span style="font-size: 18px; font-weight: bold; color: #92400e;">${data.mensajeAnuncio}</span>`;
+                    }
+                } else {
+                    banner.style.display = 'none';
+                }
+
+                let seccionCarrusel = document.getElementById('seccionCarrusel');
+                let contenedorCarrusel = document.getElementById('contenedorCarruselWeb');
+                let fotosCarrusel = data.carruselFotos || [];
+
+                if (data.habilitarCarrusel === 'si' && fotosCarrusel.length > 0) {
+                    seccionCarrusel.style.display = 'block';
+                    let carruselHtml = '';
+                    fotosCarrusel.forEach((imgUrl, index) => {
+                        let claseActiva = index === 0 ? 'activo' : '';
+                        carruselHtml += `<img src="${imgUrl}" class="carrusel-slide-img ${claseActiva}" alt="Foto Carrusel Wayki">`;
+                    });
+                    contenedorCarrusel.innerHTML = carruselHtml;
+                    iniciarRotacionCarrusel();
+                } else {
+                    seccionCarrusel.style.display = 'none';
+                    if(intervaloCarrusel) clearInterval(intervaloCarrusel);
+                }
+
+                renderizarTiendaAutomatica();
+            });
+        });
+
+        function iniciarRotacionCarrusel() {
+            if(intervaloCarrusel) clearInterval(intervaloCarrusel);
+            let slides = document.querySelectorAll('.carrusel-slide-img');
+            if(slides.length <= 1) return;
+            let currentIndex = 0;
+
+            intervaloCarrusel = setInterval(() => {
+                slides[currentIndex].classList.remove('activo');
+                currentIndex = (currentIndex + 1) % slides.length;
+                slides[currentIndex].classList.add('activo');
+            }, 3500);
+        }
+
+        function obtenerDiaYTurnoActual() {
+            let ahora = new Date();
+            let dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            let diaActual = dias[ahora.getDay()];
+            let hora = ahora.getHours();
+            let turnoActual = (hora < 16) ? 'Mañana' : 'Noche';
+            return { dia: diaActual, turno: turnoActual };
+        }
+
+        function renderizarTiendaAutomatica() {
+            let contenedor = document.getElementById('grillaCatalogoCliente');
+            let { dia, turno } = obtenerDiaYTurnoActual();
+            
+            document.getElementById('tituloDiaTurno').innerText = `Menú para hoy ${dia} (${turno})`;
+
+            let filtrados = [];
+            let menuExcel = datosWebGlobal.menuVerticalExcel;
+
+            // 1. Sincronización automática desde la matriz del Excel cargada en Firebase
+            if (menuExcel && menuExcel.length > 2) {
+                let headers = menuExcel[0].map(h => h ? h.toString().toLowerCase() : '');
+                let colIdx = -1;
+                headers.forEach((h, idx) => {
+                    if (h.includes(dia.toLowerCase()) && h.includes(turno.toLowerCase())) colIdx = idx;
+                });
+
+                if (colIdx !== -1) {
+                    for (let i = 1; i < menuExcel.length; i++) {
+                        let row = menuExcel[i];
+                        if (row[colIdx]) {
+                            filtrados.push({
+                                nombre: row[colIdx],
+                                precio: parseFloat(row[colIdx + 1]) || 0,
+                                precioPromo: 0,
+                                stock: 50,
+                                descripcion: 'Especialidad de la casa',
+                                foto: '',
+                                aderezosPermitidos: []
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 2. Respaldo por si se agregaron productos personalizados individuales desde el admin
+            if (filtrados.length === 0) {
+                let productosCustom = datosWebGlobal.productosCustom || [];
+                filtrados = productosCustom.filter(p => {
+                    let matchDia = p.categoria === dia;
+                    if(dia === 'Promos' || dia === 'Salsas') return matchDia;
+                    let matchTurno = (p.turno || 'Mañana') === turno;
+                    return matchDia && matchTurno;
+                });
+                if(filtrados.length === 0) filtrados = productosCustom.filter(p => p.categoria === dia);
+            }
+
+            if(filtrados.length === 0) {
+                contenedor.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #475569; font-size: 18px; padding: 40px;">No hay platos cargados para hoy.</p>`;
+                return;
+            }
+
+            let html = '';
+            filtrados.forEach((p) => {
+                if(p.categoria === 'Salsas') return;
+                let imgSrc = p.foto ? p.foto : 'https://via.placeholder.com/280x180?text=Wayki';
+                let precioBase = p.precioPromo && p.precioPromo > 0 ? p.precioPromo : p.precio;
+                
+                html += `
+                    <div class="card-producto">
+                        <div class="card-img-wrapper">
+                            <img src="${imgSrc}" alt="${p.nombre}">
+                        </div>
+                        <div class="card-body">
+                            <div>
+                                <h3 style="margin: 0 0 8px 0; font-size: 20px; color: #1e293b;">${p.nombre}</h3>
+                                <p style="margin: 0; font-size: 14px; color: #64748b;">${p.descripcion || ''}</p>
+                            </div>
+                            <div style="margin-top: 20px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span class="precio-final">$${precioBase}</span>
+                                    <span style="font-size: 12px; color: #059669; font-weight: bold; background: #d1fae5; padding: 3px 8px; border-radius: 4px;">Stock: ${p.stock !== undefined ? p.stock : 50}</span>
+                                </div>
+                                <button class="btn-pedir" onclick='abrirModalPersonalizar(${JSON.stringify(p)})'>Elegir / Personalizar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            contenedor.innerHTML = html;
+        }
+
+        function abrirModalPersonalizar(producto) {
+            productoSeleccionadoActual = producto;
+            document.getElementById('modalNombrePlato').innerText = producto.nombre;
+
+            let productos = datosWebGlobal.productosCustom || [];
+            let aderezosPermitidos = producto.aderezosPermitidos || [];
+            
+            let htmlSalsas = '';
+            if(aderezosPermitidos.length === 0) {
+                htmlSalsas = `<p style="color:#64748b; font-size:14px;">Este producto no requiere adicionales o salsas.</p>`;
+            } else {
+                aderezosPermitidos.forEach((nombreAderezo) => {
+                    let encontrado = productos.find(x => x.categoria === 'Salsas' && x.nombre === nombreAderezo);
+                    let precioAderezo = encontrado ? (parseFloat(encontrado.precio) || 0) : 0;
+
+                    htmlSalsas += `
+                        <div class="opcion-item" data-precio="${precioAderezo}" data-nombre="${nombreAderezo}">
+                            <div>
+                                <b>${nombreAderezo}</b><br>
+                                <span style="color:#b45309; font-size:13px;">${precioAderezo > 0 ? '+$' + precioAderezo : 'Sin cargo'}</span>
+                            </div>
+                            <div class="contador-box">
+                                <button class="btn-cnt" onclick="cambiarCantSalsa(this, -1)">-</button>
+                                <span class="val-cant" style="font-weight:bold; width:25px; text-align:center; font-size:16px;">0</span>
+                                <button class="btn-cnt" onclick="cambiarCantSalsa(this, 1)">+</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('contenedorSalsasDinamicas').innerHTML = htmlSalsas;
+            calcularPrecioModalTotal();
+            document.getElementById('modalPersonalizar').style.display = 'flex';
+        }
+
+        function cambiarCantSalsa(btn, delta) {
+            let span = btn.parentElement.querySelector('.val-cant');
+            let actual = parseInt(span.innerText) || 0;
+            let nuevo = actual + delta;
+            if(nuevo < 0) nuevo = 0;
+            span.innerText = nuevo;
+            calcularPrecioModalTotal();
+        }
+
+        function calcularPrecioModalTotal() {
+            if(!productoSeleccionadoActual) return;
+            let base = parseFloat(productoSeleccionadoActual.precioPromo && productoSeleccionadoActual.precioPromo > 0 ? productoSeleccionadoActual.precioPromo : productoSeleccionadoActual.precio);
+            let total = base;
+
+            document.querySelectorAll('#modalPersonalizar .opcion-item').forEach(item => {
+                let cant = parseInt(item.querySelector('.val-cant').innerText) || 0;
+                let precioUnit = parseFloat(item.getAttribute('data-precio') || 0);
+                total += (cant * precioUnit);
+            });
+
+            document.getElementById('modalPrecioTotal').innerText = `$${total}`;
+        }
+
+        function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function agregarAlCarritoFinal() {
+            let precioTotalPlato = parseFloat(document.getElementById('modalPrecioTotal').innerText.replace('$', ''));
+            
+            let detallesExtra = [];
+            document.querySelectorAll('#modalPersonalizar .opcion-item').forEach(item => {
+                let cant = parseInt(item.querySelector('.val-cant').innerText) || 0;
+                if(cant > 0) {
+                    let nombreSalsa = item.getAttribute('data-nombre');
+                    detallesExtra.push(`${nombreSalsa} (x${cant})`);
+                }
+            });
+
+            carritoCompras.push({
+                nombre: productoSeleccionadoActual.nombre,
+                detalles: detallesExtra.join(', '),
+                precioFinal: precioTotalPlato
+            });
+
+            document.getElementById('contadorCarrito').innerText = carritoCompras.length;
+            alert('¡Plato agregado con éxito a tu pedido!');
+            cerrarModal('modalPersonalizar');
+        }
+
+        function abrirCheckout() {
+            if (datosWebGlobal.estado === 'cerrado') {
+                alert('🔴 Lo sentimos, la tienda se encuentra cerrada temporalmente en este momento y no está recibiendo pedidos.');
+                return;
+            }
+
+            if(carritoCompras.length === 0) {
+                alert('Tu carrito está vacío. Agregá algún plato primero.');
+                return;
+            }
+            let total = carritoCompras.reduce((acc, item) => acc + item.precioFinal, 0);
+            let resumenHtml = carritoCompras.map(i => `• ${i.nombre} <small>(${i.detalles || 'Estándar'})</small> - <b>$${i.precioFinal}</b>`).join('<br>');
+            
+            document.getElementById('resumenItemsCarrito').innerHTML = resumenHtml;
+            document.getElementById('checkoutTotalFinal').innerText = total;
+            document.getElementById('checkoutHorarioProgramado').value = ''; 
+            
+            document.getElementById('modalCheckout').style.display = 'flex';
+        }
+
+        function seleccionarEntrega(tipo) {
+            tipoEntregaActual = tipo;
+            if(tipo === 'retirar') {
+                document.getElementById('btnRetirar').classList.add('seleccionado');
+                document.getElementById('btnDelivery').classList.remove('seleccionado');
+                document.getElementById('camposDelivery').style.display = 'none';
+            } else {
+                document.getElementById('btnDelivery').classList.add('seleccionado');
+                document.getElementById('btnRetirar').classList.remove('seleccionado');
+                document.getElementById('camposDelivery').style.display = 'block';
+            }
+        }
+
+        function calcularTotalConDescuento() {
+            let subtotal = carritoCompras.reduce((acc, item) => acc + item.precioFinal, 0);
+            if (!cuponAplicadoGlobal) return subtotal;
+
+            let descuento = 0;
+            if (cuponAplicadoGlobal.tipo === 'porcentaje') {
+                descuento = subtotal * (parseFloat(cuponAplicadoGlobal.valor) / 100);
+            } else {
+                descuento = parseFloat(cuponAplicadoGlobal.valor) || 0;
+            }
+            let final = subtotal - descuento;
+            return final < 0 ? 0 : Math.round(final);
+        }
+
+        function avanzarAPago() {
+            let nombre = document.getElementById('checkoutNombre').value.trim();
+            let cel = document.getElementById('checkoutCel').value.trim();
+            if(!nombre || !cel) { alert('Por favor completá tu nombre y número de celular.'); return; }
+            if(tipoEntregaActual === 'delivery' && !document.getElementById('checkoutDireccion').value.trim()) {
+                alert('Por favor ingresá la dirección para el envío.');
+                return;
+            }
+            
+            verificarCuponPrimeraCompra(cel);
+
+            let totalFinal = calcularTotalConDescuento();
+            let resumenDetalleHtml = carritoCompras.map(i => `• ${i.nombre} <small>(${i.detalles || 'Estándar'})</small> - <b>$${i.precioFinal}</b>`).join('<br>');
+            
+            if (cuponAplicadoGlobal) {
+                resumenDetalleHtml += `<br><span style="color: #16a34a; font-weight: bold;">🏷️ Cupón aplicado: ${cuponAplicadoGlobal.codigo}</span>`;
+            }
+
+            document.getElementById('resumenPagoDetalle').innerHTML = resumenDetalleHtml;
+            document.getElementById('pagoTotalPantalla').innerText = `$${totalFinal}`;
+
+            document.getElementById('inputCodigoCupon').value = '';
+            document.getElementById('mensajeCuponFeedback').innerHTML = '';
+
+            cerrarModal('modalCheckout');
+            document.getElementById('modalPago').style.display = 'flex';
+        }
+
+        function verificarCuponPrimeraCompra(celularCliente) {
+            db.ref('wayki_ventas').once('value', (snapshot) => {
+                let ventas = snapshot.val();
+                let listaVentas = ventas ? (Array.isArray(ventas) ? ventas.filter(v => v !== null) : Object.values(ventas)) : [];
+                
+                let comprasAnteriores = listaVentas.filter(v => v.cel && v.cel.trim() === celularCliente.trim());
+                if (comprasAnteriores.length > 0) return;
+
+                let cupones = datosWebGlobal.cuponesCustom || [];
+                let cuponAuto = cupones.find(c => c.destinatario === 'primera_compra');
+
+                if (cuponAuto) {
+                    cuponAplicadoGlobal = cuponAuto;
+                    let descTexto = cuponAuto.tipo === 'porcentaje' ? `${cuponAuto.valor}%` : `$${cuponAuto.valor}`;
+                    document.getElementById('mensajeCuponFeedback').innerHTML = `<span style="color: #16a34a;">¡Beneficio automático de 1era Compra aplicado (${descTexto})!</span>`;
+                    let totalFinal = calcularTotalConDescuento();
+                    document.getElementById('pagoTotalPantalla').innerText = `$${totalFinal}`;
+                }
+            });
+        }
+
+        function aplicarCuponWeb() {
+            let codigoIngresado = document.getElementById('inputCodigoCupon').value.trim().toUpperCase();
+            let feedback = document.getElementById('mensajeCuponFeedback');
+
+            if (!codigoIngresado) {
+                feedback.innerHTML = `<span style="color: #dc2626;">Escribí un código de cupón.</span>`;
+                return;
+            }
+
+            let cupones = datosWebGlobal.cuponesCustom || [];
+            let encontrado = cupones.find(c => c.codigo && c.codigo.toUpperCase() === codigoIngresado);
+
+            if (encontrado) {
+                if (encontrado.fechaExpiracion) {
+                    let hoyStr = new Date().toISOString().slice(0, 10);
+                    if (hoyStr > encontrado.fechaExpiracion) {
+                        feedback.innerHTML = `<span style="color: #dc2626;">Este cupón ya expiró.</span>`;
+                        return;
+                    }
+                }
+
+                cuponAplicadoGlobal = encontrado;
+                let descTexto = encontrado.tipo === 'porcentaje' ? `${encontrado.valor}%` : `$${encontrado.valor}`;
+                feedback.innerHTML = `<span style="color: #16a34a;">¡Cupón aplicado con éxito! (${descTexto} OFF)</span>`;
+                let totalFinal = calcularTotalConDescuento();
+                document.getElementById('pagoTotalPantalla').innerText = `$${totalFinal}`;
+            } else {
+                feedback.innerHTML = `<span style="color: #dc2626;">Cupón no válido o inexistente.</span>`;
+            }
+        }
+
+        function cambiarMetodoPago() {
+            let metodo = document.getElementById('selectMedioPago').value;
+            if(metodo === 'efectivo') {
+                document.getElementById('bloqueEfectivo').style.display = 'block';
+                document.getElementById('bloqueTransferencia').style.display = 'none';
+            } else {
+                document.getElementById('bloqueEfectivo').style.display = 'none';
+                document.getElementById('bloqueTransferencia').style.display = 'block';
+            }
+        }
+
+        function copiarAlias() {
+            let aliasText = document.getElementById('textoAlias').innerText;
+            navigator.clipboard.writeText(aliasText).then(() => {
+                alert('¡Alias copiado al portapapeles!');
+            }).catch(err => {
+                alert('Alias: ' + aliasText);
+            });
+        }
+
+        function enviarPedidoFinalFirebase() {
+            let nombre = document.getElementById('checkoutNombre').value.trim();
+            let cel = document.getElementById('checkoutCel').value.trim();
+            let dir = tipoEntregaActual === 'delivery' ? document.getElementById('checkoutDireccion').value.trim() : 'Retira en Mostrador';
+            let aclaracion = tipoEntregaActual === 'delivery' ? document.getElementById('checkoutAclaracion').value.trim() : '';
+            let horario = document.getElementById('checkoutHorarioProgramado').value.trim() || 'Lo antes posible';
+            let medioPago = document.getElementById('selectMedioPago').value;
+            let pagaCon = document.getElementById('pagoConCuanto').value.trim();
+            let totalFinal = calcularTotalConDescuento();
+
+            let nuevoPedido = {
+                id: Math.floor(1000 + Math.random() * 9000),
+                nombre: nombre,
+                cel: cel,
+                dir: dir,
+                aclaracion: aclaracion,
+                tipoEntrega: tipoEntregaActual,
+                horarioEntrega: horario,
+                medioPago: medioPago,
+                pagaCon: pagaCon ? `$${pagaCon}` : 'Justo',
+                total: totalFinal,
+                cuponUsado: cuponAplicadoGlobal ? cuponAplicadoGlobal.codigo : 'Ninguno',
+                items: carritoCompras
+            };
+
+            db.ref('wayki_pedidos_web').push(nuevoPedido);
+
+            alert('¡Pedido enviado con éxito! Ya fue recibido en el local.');
+            carritoCompras = [];
+            cuponAplicadoGlobal = null;
+            document.getElementById('contadorCarrito').innerText = 0;
+            cerrarModal('modalPago');
+        }
+    </script>
+</body>
+</html>
