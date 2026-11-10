@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAYKI - Base de Datos, Semáforo y Marketing WhatsApp</title>
+    <!-- Librería SheetJS para exportar a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1300px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2, h3 { color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-top: 0; }
+        .controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        input[type="text"], textarea { padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        .btn { background: #27ae60; color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 13px; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #219653; }
+        .btn-excel { background: #2980b9; }
+        .btn-excel:hover { background: #1f618d; }
+        .btn-wsp-config { background: #8e44ad; }
+        .btn-wsp-config:hover { background: #732d91; }
+        .btn-danger { background: #c0392b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-edit { background: #d35400; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-naranja { background: #e67e22; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-naranja:hover { background: #d35400; }
+        .btn-enviado { background: #7f8c8d !important; color: white !important; }
+        .btn-filtro { background: #e0e0e0; color: #333; border: 1px solid #ccc; }
+        .btn-filtro.active { background: #2c3e50; color: white; border-color: #1a252f; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 13px; vertical-align: top; }
+        th { background: #f8f9fa; color: #2c3e50; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-block; margin-bottom: 4px; }
+        .badge-vip { background: #fef3c7; color: #d97706; border: 1px solid #f59e0b; }
+        .badge-frecuente { background: #ebf5fb; color: #2980b9; border: 1px solid #2980b9; }
+        .badge-nuevo { background: #eafaf1; color: #27ae60; border: 1px solid #27ae60; }
+        .badge-inactivo { background: #fdf2f2; color: #c0392b; border: 1px solid #f5c6cb; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 25px; border-radius: 10px; width: 650px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 85vh; overflow-y: auto; }
+        .section-box { background: #fdf8f0; border: 1px solid #f39c12; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<!-- MODAL CONFIGURACIÓN MENSAJES -->
+<div id="modalConfigWsp" class="modal">
+    <div class="modal-box">
+        <h3>📢 Configuración del Menú Masivo y Plantillas</h3>
+        
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight:bold; font-size:13px; color:#d97706;">🔴 Mensaje para Inactivos (>30 días - Rescate con Cupón):</label>
+            <textarea id="tplInactivo" rows="3">¡Hola [Nombre]! Te saludamos de Wayki Casa de Comidas. Vemos que hace días no nos pedís y te queremos regalar un 10% OFF en tu próximo pedido usando el cupón WAYKI10. ¿Qué te gustaría comer hoy? 🥟</textarea>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight:bold; font-size:13px; color:#d97706;">⭐ Mensaje para VIP / Frecuentes:</label>
+            <textarea id="tplVip" rows="3">¡Hola [Nombre]! Gracias por elegirnos siempre en Wayki. Hoy tenemos el menú especial del día preparado especialmente para nuestros clientes preferidos. ¿Te armamos tu pedido habitual? 🛵</textarea>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight:bold; font-size:13px; color:#d97706;">✨ Mensaje para Nuevos:</label>
+            <textarea id="tplNuevo" rows="3">¡Hola [Nombre]! Qué bueno sumarte a Wayki Casa de Comidas. Recordá que podés pedir tus platos regionales favoritos al WhatsApp. ¡Esperamos tu pedido! 🥟</textarea>
+        </div>
+
+        <div class="section-box" style="margin-top:20px;">
+            <h4 style="margin-top:0; color:#c0392b;">📋 Menú del Día para el Botón Naranja</h4>
+            <p style="font-size:12px; color:#555;">Escribí o pegá acá el menú y precios. Al hacer clic en el botón naranja de cada cliente, se enviará este texto de forma personalizada.</p>
+            <textarea id="textoMenuMasivo" rows="4" placeholder="Pegá acá el menú del día, promos y precios..."></textarea>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button class="btn" style="background:#27ae60; flex:1;" onclick="guardarConfigWsp()">💾 Guardar Configuración</button>
+            <button class="btn" onclick="cerrarModalConfigWsp()" style="background: #7f8c8d; width:auto;">Cerrar Ventana</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL MODIFICAR CLIENTE -->
+<div id="modalEditarCliente" class="modal">
+    <div class="modal-box" style="width: 450px;">
+        <h3 style="color: #2c3e50; margin-top:0;">✏️ Modificar Datos del Cliente</h3>
+        <input type="hidden" id="editCelOriginal">
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 13px; font-weight: bold;">Nombre y Apellido:</label>
+            <input type="text" id="editNombre" style="margin-top: 4px;">
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 13px; font-weight: bold;">Celular:</label>
+            <input type="text" id="editCel" style="margin-top: 4px;">
+        </div>
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 13px; font-weight: bold;">Dirección:</label>
+            <input type="text" id="editDir" style="margin-top: 4px;">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn" style="background: #27ae60; flex: 1;" onclick="guardارCambiosCliente()">💾 Guardar Cambios</button>
+            <button class="btn" onclick="cerrarModalEditar()" style="background: #7f8c8d; width: auto;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL FICHA CLIENTE -->
+<div id="modalCliente" class="modal">
+    <div class="modal-box" style="width: 450px;">
+        <h3 id="modalNombreCliente" style="color: #2c3e50; margin-top:0; border-bottom:2px solid #eee; padding-bottom:8px;">Ficha del Cliente</h3>
+        <p><b>Celular:</b> <span id="modalCelCliente"></span></p>
+        <p><b>Dirección:</b> <span id="modalDirCliente"></span></p>
+        <p><b>Total Pedidos Realizados:</b> <span id="modalTotalPedidos"></span></p>
+        <p><b>Platos Favoritos (Más pedidos):</b></p>
+        <div id="modalPlatosFavoritos" style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; margin-bottom: 15px; border: 1px solid #ddd;"></div>
+        
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold; font-size: 13px;">Notas / Preferencias del Cliente:</label>
+            <textarea id="modalNotaCliente" rows="2" style="width:100%; padding:8px; box-sizing:border-box; border:1px solid #ccc; border-radius:4px; font-size:13px;" placeholder="Escribí notas especiales..."></textarea>
+            <button class="btn" style="margin-top: 5px; background: #2980b9;" onclick="guardarNotaCliente()">💾 Guardar Nota</button>
+        </div>
+
+        <button class="btn" onclick="cerrarModalCliente()" style="background: #7f8c8d; width:100%;">Cerrar Ficha</button>
+    </div>
+</div>
+
+<div class="container">
+    <h2>
+        <span>👥 Base de Datos de Clientes & Semáforo Pro - Wayki</span>
+        <div>
+            <button class="btn btn-wsp-config" onclick="abrirModalConfigWsp()">📢 Config. Menú & Mensajes</button>
+            <button class="btn btn-excel" onclick="exportarClientesExcel()">📊 Exportar a Excel</button>
+        </div>
+    </h2>
+
+    <div class="controls">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items:center;">
+            <input type="text" id="buscadorCliente" placeholder="🔍 Buscar por nombre o celular..." oninput="aplicarFiltros()">
+            <button class="btn btn-filtro active" id="filtroTodos" onclick="filtrarSemaf_('todos')">Todos</button>
+            <button class="btn btn-filtro" id="filtroVip" onclick="filtrarSemaf_('vip')">⭐ VIP / Frecuentes</button>
+            <button class="btn btn-filtro" id="filtroNuevos" onclick="filtrarSemaf_('nuevos')">✨ Nuevos</button>
+            <button class="btn btn-filtro" id="filtroInactivos" onclick="filtrarSemaf_('inactivos')">🔴 Inactivos (>30 días)</button>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn" style="background: #c0392b; padding: 6px 10px; font-size: 12px;" onclick="reiniciarColoresNaranjas()">🔄 Reiniciar Botones Naranjas</button>
+            <div style="font-size: 14px; color: #666;">Filtrados: <b id="lblTotalClientes" style="color: #2c3e50;">0</b></div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>CLIENTE</th>
+                <th>CELULAR / DIR</th>
+                <th>ESTADO / SEMÁFORO</th>
+                <th>ÚLTIMO PEDIDO</th>
+                <th>PLATOS FAVORITOS</th>
+                <th>ACCIONES Y WSP</th>
+            </tr>
+        </thead>
+        <tbody id="tablaClientesBody">
+            <tr><td colspan="6" style="text-align:center; padding:20px; color:#777;">Cargando base de datos de clientes...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCEuKDbrqXTfMM7Z6PLpTB6TsVCvvHWq_o",
+        authDomain: "wayki-cocina.firebaseapp.com",
+        projectId: "wayki-cocina",
+        storageBucket: "wayki-cocina.firebasestorage.app",
+        messagingSenderId: "750389109772",
+        appId: "1:750389109772:web:b8d290bf5dbc1fd339fa29"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let listaClientes = [];
+    let ventasHistoricas = [];
+    let notasClientes = {};
+    let configWsp = {
+        tplInactivo: "¡Hola [Nombre]! Te saludamos de Wayki Casa de Comidas. Vemos que hace días no nos pedís y te queremos regalar un 10% OFF en tu próximo pedido usando el cupón WAYKI10. ¿Qué te gustaría comer hoy? 🥟",
+        tplVip: "¡Hola [Nombre]! Gracias por elegirnos siempre en Wayki. Hoy tenemos el menú especial del día preparado especialmente para nuestros clientes preferidos. ¿Te armamos tu pedido habitual? 🛵",
+        tplNuevo: "¡Hola [Nombre]! Qué bueno sumarte a Wayki Casa de Comidas. Recordá que podés pedir tus platos regionales favoritos al WhatsApp. ¡Esperamos tu pedido! 🥟"
+    };
+    let filtroActualSemaf = 'todos';
+    let clienteActualCel = '';
+    let clientesProcesadosGlobal = [];
+    
+    // Memoria local de botones naranjas enviados (se limpian solos a las horas o con el botón de reinicio)
+    let enviosMasivosLocal = JSON.parse(localStorage.getItem('wayki_envios_masivos')) || {};
+
+    window.addEventListener('DOMContentLoaded', () => {
+        db.ref('wayki_ventas').on('value', (snapshot) => {
+            let data = snapshot.val();
+            ventasHistoricas = data ? (Array.isArray(data) ? data.filter(v => v !== null) : Object.values(data)) : [];
+            procesarYRenderizar();
+        });
+
+        db.ref('wayki_config_web/baseClientes').on('value', (snapshot) => {
+            let data = snapshot.val();
+            listaClientes = data ? (Array.isArray(data) ? data.filter(c => c !== null) : Object.values(data)) : [];
+            procesarYRenderizar();
+        });
+
+        db.ref('wayki_config_web/notasClientes').on('value', (snapshot) => {
+            notasClientes = snapshot.val() || {};
+        });
+
+        db.ref('wayki_config_web/configWspMensajes').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if(data) {
+                configWsp = data;
+                if(data.textoMenuMasivo) document.getElementById('textoMenuMasivo').value = data.textoMenuMasivo;
+                document.getElementById('tplInactivo').value = configWsp.tplInactivo || '';
+                document.getElementById('tplVip').value = configWsp.tplVip || '';
+                document.getElementById('tplNuevo').value = configWsp.tplNuevo || '';
+            }
+        });
+    });
+
+    function procesarYRenderizar() {
+        let mapaClientes = {};
+        
+        listaClientes.forEach((c, idx) => {
+            if (c.cel) {
+                let celLimpio = c.cel.replace(/\D/g, '');
+                if (celLimpio.length >= 6) {
+                    mapaClientes[celLimpio] = { ...c, celLimpio, _firebaseIndex: idx };
+                }
+            }
+        });
+
+        ventasHistoricas.forEach(v => {
+            if (v.cel && v.nombre && v.nombre.toLowerCase() !== 'consumidor final' && v.nombre.trim() !== '') {
+                let celLimpio = v.cel.replace(/\D/g, '');
+                if (celLimpio.length >= 6 && !mapaClientes[celLimpio]) {
+                    mapaClientes[celLimpio] = {
+                        nombre: v.nombre,
+                        cel: v.cel,
+                        celLimpio: celLimpio,
+                        direccion: v.dir || '',
+                        ultimoPedido: v.fechaTexto || '',
+                        fechaUltimoIso: v.fechaYyyyMmDd || ''
+                    };
+                }
+            }
+        });
+
+        clientesProcesadosGlobal = Object.values(mapaClientes);
+        renderTablaClientes(clientesProcesadosGlobal);
+    }
+
+    function renderTablaClientes(clientes) {
+        let textoBusq = document.getElementById('buscadorCliente').value.toLowerCase();
+        let ahoraIso = new Date().toISOString().slice(0, 10);
+        let ahoraMs = Date.now();
+
+        let filtrados = clientes.filter(c => {
+            let matchTexto = (c.nombre && c.nombre.toLowerCase().includes(textoBusq)) || (c.cel && c.cel.toLowerCase().includes(textoBusq));
+            if (!matchTexto) return false;
+
+            let comprasC = ventasHistoricas.filter(v => v.cel && v.cel.replace(/\D/g, '') === c.celLimpio);
+            let totalC = comprasC.length;
+
+            let diasInactivo = 0;
+            if (c.fechaUltimoIso) {
+                let diffTime = Math.abs(new Date(ahoraIso) - new Date(c.fechaUltimoIso));
+                diasInactivo = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            } else if (totalC === 0) {
+                diasInactivo = 0;
+            } else {
+                diasInactivo = 35;
+            }
+
+            c._diasInactivo = diasInactivo;
+            c._totalCompras = totalC;
+
+            if (filtroActualSemaf === 'vip') return totalC >= 3;
+            if (filtroActualSemaf === 'nuevos') return totalC === 1 || totalC === 0;
+            if (filtroActualSemaf === 'inactivos') return diasInactivo > 30 && totalC > 0;
+            return true;
+        });
+
+        let tbody = document.getElementById('tablaClientesBody');
+        document.getElementById('lblTotalClientes').innerText = filtrados.length;
+
+        if (filtrados.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#777;">No se encontraron clientes con este filtro.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        filtrados.slice().reverse().forEach(c => {
+            let totalC = c._totalCompras;
+            let diasInactivo = c._diasInactivo;
+
+            let estadoBadge = `<span class="badge badge-nuevo">✨ Nuevo (1 compra)</span>`;
+            let tipoColorWsp = 'nuevo';
+            if (totalC >= 3) {
+                estadoBadge = `<span class="badge badge-vip">⭐ VIP / Frecuente (${totalC} compras)</span>`;
+                tipoColorWsp = 'vip';
+            } else if (diasInactivo > 30 && totalC > 0) {
+                estadoBadge = `<span class="badge badge-inactivo">🔴 Inactivo (${diasInactivo} días)</span>`;
+                tipoColorWsp = 'inactivo';
+            } else if (totalC > 1) {
+                estadoBadge = `<span class="badge badge-frecuente">✅ Habitual (${totalC} compras)</span>`;
+                tipoColorWsp = 'vip';
+            }
+
+            let conteoPlatos = {};
+            ventasHistoricas.filter(v => v.cel && v.cel.replace(/\D/g, '') === c.celLimpio).forEach(v => {
+                if (v.items) {
+                    v.items.forEach(it => { conteoPlatos[it.nombre] = (conteoPlatos[it.nombre] || 0) + it.cantidad; });
+                }
+            });
+            let platosOrdenados = Object.entries(conteoPlatos).sort((a,b) => b[1] - a[1]);
+            let favoritosTxt = platosOrdenados.length > 0 ? platosOrdenados.slice(0, 2).map(p => `• ${p[0]} (${p[1]}x)`).join('<br>') : 'Sin registro';
+
+            let notaCliente = notasClientes[c.celLimpio] ? `<div style="font-size:11px; color:#d97706; margin-top:3px;"><b>Nota:</b> ${notasClientes[c.celLimpio]}</div>` : '';
+
+            // Verificar si ya se le envió el menú masivo recientemente (menos de 3 horas)
+            let enviadoInfo = enviosMasivosLocal[c.celLimpio];
+            let yaEnviado = enviadoInfo && (ahoraMs - enviadoInfo < 3 * 60 * 60 * 1000); // 3 horas de vigencia
+            let claseBtnNaranja = yaEnviado ? 'btn-naranja btn-enviado' : 'btn-naranja';
+            let textoBtnNaranja = yaEnviado ? '✔️ Enviado' : '📢 Menú';
+
+            html += `
+                <tr>
+                    <td><b>${c.nombre || 'Cliente'}</b>${notaCliente}</td>
+                    <td>${c.cel || 'S/N'}<br><span style="color:#666; font-size:12px;">${c.direccion || ''}</span></td>
+                    <td>${estadoBadge}</td>
+                    <td>${c.ultimoPedido || 'Reciente'}</td>
+                    <td style="font-size:12px; color:#444;">${favoritosTxt}</td>
+                    <td>
+                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                            <button class="btn" style="padding: 4px 8px; font-size: 11px; background:#25D366;" onclick="enviarWspSegunEstado('${c.celLimpio}', '${(c.nombre || 'Cliente').replace(/'/g, "\\'")}', '${tipoColorWsp}')" title="Chat y Estado">💬 Wsp</button>
+                            <button class="${claseBtnNaranja}" id="btnNaranja_${c.celLimpio}" onclick="enviarMenuMasivoIndividual('${c.celLimpio}', '${(c.nombre || 'Cliente').replace(/'/g, "\\'")}')">${textoBtnNaranja}</button>
+                            <button class="btn-edit" onclick="abrirModalEditar('${c.celLimpio}', '${(c.nombre || '').replace(/'/g, "\\'")}', '${c.cel || ''}', '${(c.direccion || '').replace(/'/g, "\\'")}')">✏️</button>
+                            <button class="btn" style="padding: 4px 8px; font-size: 11px; background:#8e44ad;" onclick="abrirFichaCliente('${c.celLimpio}', '${(c.nombre || 'Cliente').replace(/'/g, "\\'")}', '${c.cel || ''}', '${(c.direccion || '').replace(/'/g, "\\'")}', ${totalC})">📁</button>
+                            <button class="btn-danger" onclick="borrarCliente('${c.celLimpio}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    // BOTÓN NARANJA: Envía el menú masivo personalizado y cambia de color
+    function enviarMenuMasivoIndividual(celLimpio, nombreCliente) {
+        let textoMenu = document.getElementById('textoMenuMasivo').value.trim();
+        if (!textoMenu) {
+            alert('⚠️ Primero cargá el menú del día haciendo clic en "📢 Config. Menú & Mensajes" arriba a la derecha.');
+            abrirModalConfigWsp();
+            return;
+        }
+
+        let mensajePersonalizado = `¡Hola ${nombreCliente}! 👋 Te compartimos el menú y las promos de hoy en Wayki:\n\n${textoMenu}\n\n¿Qué te mandamos hoy? 🛵🥟`;
+        window.open(`https://wa.me/549${celLimpio}?text=${encodeURIComponent(mensajePersonalizado)}`, '_blank');
+
+        // Marcar en memoria local que ya se le envió (cambia el botón a gris)
+        enviosMasivosLocal[celLimpio] = Date.now();
+        localStorage.setItem('wayki_envios_masivos', JSON.stringify(enviosMasivosLocal));
+
+        let btn = document.getElementById(`btnNaranja_${celLimpio}`);
+        if(btn) {
+            btn.className = 'btn-naranja btn-enviado';
+            btn.innerText = '✔️ Enviado';
+        }
+    }
+
+    function reiniciarColoresNaranjas() {
+        if(confirm('¿Desea reiniciar el color de todos los botones naranjas para empezar un nuevo turno?')) {
+            enviosMasivosLocal = {};
+            localStorage.removeItem('wayki_envios_masivos');
+            procesarYRenderizar();
+        }
+    }
+
+    function borrarCliente(celLimpio) {
+        if (confirm('¿Estás seguro de eliminar este cliente de la base de datos?')) {
+            let nuevaLista = listaClientes.filter(c => c.cel && c.cel.replace(/\D/g, '') !== celLimpio);
+            db.ref('wayki_config_web/baseClientes').set(nuevaLista).then(() => {
+                alert('¡Cliente eliminado con éxito!');
+            });
+        }
+    }
+
+    function abrirModalEditar(celLimpio, nombre, cel, dir) {
+        document.getElementById('editCelOriginal').value = celLimpio;
+        document.getElementById('editNombre').value = nombre;
+        document.getElementById('editCel').value = cel;
+        document.getElementById('editDir').value = dir;
+        document.getElementById('modalEditarCliente').style.display = 'flex';
+    }
+
+    function cerrarModalEditar() { document.getElementById('modalEditarCliente').style.display = 'none'; }
+
+    function guardarCambiosCliente() {
+        let celOriginal = document.getElementById('editCelOriginal').value;
+        let nuevoNombre = document.getElementById('editNombre').value.trim();
+        let nuevoCel = document.getElementById('editCel').value.trim();
+        let nuevaDir = document.getElementById('editDir').value.trim();
+
+        if (!nuevoNombre || !nuevoCel) { alert('El nombre y el celular son obligatorios.'); return; }
+
+        let index = listaClientes.findIndex(c => c.cel && c.cel.replace(/\D/g, '') === celOriginal);
+        if (index !== -1) {
+            listaClientes[index].nombre = nuevoNombre;
+            listaClientes[index].cel = nuevoCel;
+            listaClientes[index].direccion = nuevaDir;
+        } else {
+            listaClientes.push({ nombre: nuevoNombre, cel: nuevoCel, direccion: nuevaDir, ultimoPedido: 'Manual' });
+        }
+
+        db.ref('wayki_config_web/baseClientes').set(listaClientes).then(() => {
+            alert('¡Cliente modificado con éxito!');
+            cerrarModalEditar();
+        });
+    }
+
+    function enviarWspSegunEstado(celLimpio, nombreCliente, tipo) {
+        let template = configWsp.tplNuevo;
+        if (tipo === 'vip') template = configWsp.tplVip;
+        if (tipo === 'inactivo') template = configWsp.tplInactivo;
+
+        let mensajeFinal = template.replace(/\[Nombre\]/g, nombreCliente);
+        window.open(`https://wa.me/549${celLimpio}?text=${encodeURIComponent(mensajeFinal)}`, '_blank');
+    }
+
+    function abrirModalConfigWsp() { document.getElementById('modalConfigWsp').style.display = 'flex'; }
+    function cerrarModalConfigWsp() { document.getElementById('modalConfigWsp').style.display = 'none'; }
+
+    function guardarConfigWsp() {
+        configWsp = {
+            textoMenuMasivo: document.getElementById('textoMenuMasivo').value,
+            tplInactivo: document.getElementById('tplInactivo').value,
+            tplVip: document.getElementById('tplVip').value,
+            tplNuevo: document.getElementById('tplNuevo').value
+        };
+        db.ref('wayki_config_web/configWspMensajes').set(configWsp).then(() => {
+            alert('¡Configuración guardada con éxito!');
+            cerrarModalConfigWsp();
+        });
+    }
+
+    function filtrarSemaf_(tipo) {
+        filtroActualSemaf = tipo;
+        document.querySelectorAll('.btn-filtro').forEach(b => b.classList.remove('active'));
+        if (tipo === 'todos') document.getElementById('filtroTodos').classList.add('active');
+        if (tipo === 'vip') document.getElementById('filtroVip').classList.add('active');
+        if (tipo === 'nuevos') document.getElementById('filtroNuevos').classList.add('active');
+        if (tipo === 'inactivos') document.getElementById('filtroInactivos').classList.add('active');
+        procesarYRenderizar();
+    }
+
+    function aplicarFiltros() { procesarYRenderizar(); }
+
+    function abrirFichaCliente(celLimpio, nombre, cel, dir, totalPedidos) {
+        clienteActualCel = celLimpio;
+        document.getElementById('modalNombreCliente').innerText = `Ficha de: ${nombre}`;
+        document.getElementById('modalCelCliente').innerText = cel;
+        document.getElementById('modalDirCliente').innerText = dir;
+        document.getElementById('modalTotalPedidos').innerText = totalPedidos + ' pedidos';
+        document.getElementById('modalNotaCliente').value = notasClientes[celLimpio] || '';
+
+        let comprasC = ventasHistoricas.filter(v => v.cel && v.cel.replace(/\D/g, '') === celLimpio);
+        let conteoPlatos = {};
+        comprasC.forEach(v => {
+            if (v.items) {
+                v.items.forEach(it => { conteoPlatos[it.nombre] = (conteoPlatos[it.nombre] || 0) + it.cantidad; });
+            }
+        });
+        let platosOrdenados = Object.entries(conteoPlatos).sort((a,b) => b[1] - a[1]);
+        let favHtml = platosOrdenados.length > 0 ? platosOrdenados.map(p => `<b>${p[0]}</b> - Pedido ${p[1]} veces<br>`).join('') : 'Aún no hay compras registradas.';
+        document.getElementById('modalPlatosFavoritos').innerHTML = favHtml;
+
+        document.getElementById('modalCliente').style.display = 'flex';
+    }
+
+    function cerrarModalCliente() { document.getElementById('modalCliente').style.display = 'none'; }
+
+    function guardarNotaCliente() {
+        let notaTxt = document.getElementById('modalNotaCliente').value.trim();
+        if (clienteActualCel) {
+            notasClientes[clienteActualCel] = notaTxt;
+            db.ref('wayki_config_web/notasClientes').set(notasClientes).then(() => {
+                alert('¡Nota guardada con éxito!');
+                cerrarModalCliente();
+                procesarYRenderizar();
+            });
+        }
+    }
+
+    function exportarClientesExcel() {
+        let wb = XLSX.utils.book_new();
+        let wsData = [["Nombre y Apellido", "Celular", "Dirección", "Total Pedidos", "Último Pedido"]];
+        clientesProcesadosGlobal.forEach(c => {
+            wsData.push([c.nombre || '', c.cel || '', c.direccion || '', c._totalCompras || 0, c.ultimoPedido || '']);
+        });
+        let ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "ClientesWaykiVIP");
+        XLSX.writeFile(wb, `Base_Clientes_Wayki_Completa_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+</script>
+
+</body>
+</html>
