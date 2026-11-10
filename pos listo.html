@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="tituloPestana">WAYKI - Sistema POS Comercial Pro</title>
+    <!-- Librería SheetJS para leer y generar archivos Excel (.xlsx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        .container { display: flex; gap: 20px; max-width: 1350px; margin: 0 auto; }
+        .panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .left-panel { flex: 2; }
+        .right-panel { flex: 1; }
+        h2, h3 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .toggle-btn { flex: 1; padding: 10px; border: 1px solid #ccc; background: #e0e0e0; cursor: pointer; text-align: center; border-radius: 4px; font-weight: bold; }
+        .toggle-btn.active { background: #e67e22; color: #fff; border-color: #d35400; }
+        .toggle-btn.active-blue { background: #2980b9; color: #fff; border-color: #1f618d; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; font-size: 13px; vertical-align: top; }
+        th { background: #f8f9fa; }
+        .btn { background: #27ae60; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; width: 100%; font-size: 15px; margin-top: 5px; }
+        .btn:hover { background: #219653; }
+        .btn-danger { background: #c0392b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-print { background: #2980b9; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-edit { background: #8e44ad; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-repeat { background: #d35400; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-wsp-card { background: #25D366; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; text-decoration: none; display: inline-block; }
+        .btn-whatsapp { background: #25D366; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; text-decoration: none; display: inline-block; width: 100%; text-align: center; margin-top: 8px; }
+        .total-box { font-size: 22px; font-weight: bold; color: #e67e22; text-align: right; margin: 15px 0; }
+        .sales-list { max-height: 520px; overflow-y: auto; }
+        
+        /* TARJETAS DE COMANDAS COLOREADAS SEGÚN ESTADO Y COCINA */
+        .sale-item { background: #ffffff; border-left: 6px solid #2980b9; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .sale-item.comanda-azul { border-left-color: #2980b9; background: #ebf5fb; }
+        .sale-item.comanda-amarilla { border-left-color: #d35400; background: #fef9e7; }
+        .sale-item.comanda-roja { border-left-color: #c0392b; background: #fdf2f2; animation: parpadeoAlerta 1.5s infinite; }
+        .sale-item.comanda-verde { border-left-color: #27ae60; background: #eafaf1; }
+        .sale-item.comanda-rosa { border-left-color: #e879f9; background: #fdf4ff; }
+        .sale-item.comanda-blanca { border-left-color: #7f8c8d; background: #ffffff; opacity: 0.75; }
+
+        @keyframes parpadeoAlerta { 0% { opacity: 1; } 50% { opacity: 0.85; } 100% { opacity: 1; } }
+
+        .brand-logo-container { background-color: #6a0d1b; color: #fdf0d5; text-align: center; padding: 15px 10px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .brand-logo-title { font-family: 'Georgia', serif; font-size: 28px; font-weight: bold; letter-spacing: 2px; margin: 0; color: #fdf0d5; }
+        .brand-logo-subtitle { font-size: 13px; letter-spacing: 1px; margin-top: 4px; color: #f39c12; font-weight: bold; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 25px; border-radius: 10px; width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+
+        #pantallaLogin { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; z-index: 99999; display: flex; justify-content: center; align-items: center; }
+        .login-box { background: white; padding: 30px; border-radius: 10px; width: 380px; box-shadow: 0 5px 20px rgba(0,0,0,0.4); text-align: center; }
+        
+        @media print {
+            @page { margin: 0; size: 72mm auto; }
+            body, html { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+            .no-print, header, aside, .container, .modal, div[style*="background: #27ae60"] { display: none !important; }
+            body * { visibility: hidden !important; }
+            #ticket-impresion, #ticket-impresion * { visibility: visible !important; }
+            #ticket-impresion { 
+                display: block !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 72mm !important; 
+                margin: 0 !important; padding: 5mm !important; font-family: 'Courier New', Courier, monospace !important; 
+                font-size: 13px !important; line-height: 1.2 !important; color: #000 !important; background: #fff !important; font-weight: bold !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN INICIAL -->
+<div id="pantallaLogin">
+    <div class="login-box">
+        <h2 style="color: #6a0d1b; border: none; margin-bottom: 5px;" id="loginTituloNegocio">COMIDAS WAYKI</h2>
+        <p style="font-size: 13px; color: #666; margin-top: 0;">Sistema POS Comercial - Iniciar Sesión</p>
+        <div class="form-group" style="text-align: left; margin-top: 20px;">
+            <label>Seleccionar Perfil:</label>
+            <select id="loginRol" onchange="togglePasswordCampo()" style="font-weight: bold;">
+                <option value="empleado">👤 Empleado / Cajero (Operativo)</option>
+                <option value="admin">🔒 Administrador (Acceso Total)</option>
+            </select>
+        </div>
+        <div class="form-group" id="grupoPassword" style="text-align: left; display: none;">
+            <label>Contraseña de Administrador:</label>
+            <input type="password" id="loginPass" placeholder="Ingresá contraseña...">
+        </div>
+        <button class="btn" style="background: #6a0d1b; margin-top: 15px;" onclick="ejecutarLogin()">Ingresar al Sistema</button>
+    </div>
+</div>
+
+<!-- AUDIOS OCULTOS PARA ALARMA EN LA PC -->
+<audio id="audioAlarmaPOS" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+</audio>
+
+<!-- MODAL MENÚ DE ADMINISTRACIÓN Y HERRAMIENTAS -->
+<div id="modalMenuAdmin" class="modal">
+    <div class="modal-box" style="width: 500px;">
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-bottom: 15px;">⚙️ Panel de Administración y Herramientas</h3>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button onclick="abrirModalGastos(); cerrarMenuAdmin();" style="background: #c0392b; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">💸 Registrar Gastos (Gas, Insumos, Alquiler)</button>
+            <button onclick="window.open('clientes_wayki.html', '_blank')" style="background: #16a34a; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">👥 Base de Datos Clientes & Semáforo (Nueva Página)</button>
+            <button onclick="abrirConfiguracionNegocio(); cerrarMenuAdmin();" style="background: #2c3e50; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">⚙️ Configuración General del Negocio</button>
+            <button onclick="abrirPanelCupones(); cerrarMenuAdmin();" style="background: #8e44ad; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">🏷️ Administrar Cupones de Descuento</button>
+            <button onclick="window.open('https://wayki629.github.io/cocina-wayki-/', '_blank')" style="background: #2980b9; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">📺 Abrir Pantalla Cocina (KDS)</button>
+            <button onclick="abrirReportes(); cerrarMenuAdmin();" style="background: #e67e22; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">📅 Corte de Caja y Balance Financiero</button>
+            <button onclick="exportarReporteVentasExcel(); cerrarMenuAdmin();" style="background: #27ae60; color:white; border:none; padding:12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; text-align:left;">📊 Exportar Reporte de Ventas (Excel)</button>
+        </div>
+        <button class="btn" onclick="cerrarMenuAdmin()" style="margin-top: 20px; background: #7f8c8d;">Cerrar Menú</button>
+    </div>
+</div>
+
+<!-- MODAL CONFIGURACIÓN GENERAL -->
+<div id="modalConfiguracion" class="modal">
+    <div class="modal-box" style="width: 500px; max-height: 85vh; overflow-y: auto;">
+        <h3 style="color: #2c3e50;">⚙️ Configuración General del Negocio</h3>
+        <div class="form-group"><label>Nombre del Negocio:</label><input type="text" id="confNombreNegocio"></div>
+        <div class="form-group"><label>Subtítulo / Slogan:</label><input type="text" id="confSubtitulo"></div>
+        <div class="form-group"><label>Dirección:</label><input type="text" id="confDireccion"></div>
+        <div class="form-group"><label>Teléfono de Contacto:</label><input type="text" id="confTelefono"></div>
+        <div class="form-group"><label>Contraseña Administrador:</label><input type="text" id="confPasswordAdmin"></div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn" style="background: #27ae60; margin-top:0;" onclick="guardarConfiguracionNegocio()">Guardar Cambios</button>
+            <button class="btn" onclick="cerrarModalConfiguracion()" style="background: #7f8c8d; margin-top:0; width: auto;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REGISTRO DE GASTOS -->
+<div id="modalGastos" class="modal">
+    <div class="modal-box" style="width: 600px; max-height: 85vh; overflow-y: auto;">
+        <h3 style="color: #c0392b;">💸 Registro de Gastos Operativos (Gas, Alquiler, Insumos)</h3>
+        <p style="font-size: 12px; color: #666;">Cargá los gastos del mes para que el sistema calcule automáticamente tu ganancia neta.</p>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #fdf2f2; padding: 10px; border-radius: 6px; border: 1px solid #f5c6cb;">
+            <div style="flex: 2;"><label style="font-size: 12px;">Concepto / Detalle:</label><input type="text" id="gastoConcepto" placeholder="Ej: Compra de carne / Garrafa gas"></div>
+            <div style="flex: 1;"><label style="font-size: 12px;">Monto ($):</label><input type="number" id="gastoMonto" placeholder="Ej: 15000"></div>
+            <div style="flex: 1; display: flex; align-items: flex-end;"><button class="btn" style="background: #c0392b; margin-top:0;" onclick="agregarGasto()">+ Agregar</button></div>
+        </div>
+
+        <table>
+            <thead><tr><th>FECHA</th><th>CONCEPTO</th><th>MONTO</th><th>ACCIONES</th></tr></thead>
+            <tbody id="tablaGastosAdmin"><tr><td colspan="4" style="text-align:center; padding:15px; color:#777;">No hay gastos registrados.</td></tr></tbody>
+        </table>
+        <div style="margin-top: 15px; text-align: right; font-size: 18px;">
+            <b>TOTAL GASTOS: <span id="lblTotalGastos" style="color: #c0392b;">$0</span></b>
+        </div>
+        <button class="btn" onclick="cerrarModalGastos()" style="margin-top: 20px; background: #34495e;">Cerrar Ventana</button>
+    </div>
+</div>
+
+<!-- MODAL REPORTES CON BALANCE -->
+<div id="modalReportes" class="modal">
+    <div class="modal-box" style="width: 550px;">
+        <h3>📊 Corte de Caja y Balance Financiero</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+            <div style="flex: 1;"><label style="font-size: 12px;">Desde:</label><input type="date" id="fechaDesde" onchange="calcularReporteRango()" style="font-size: 13px; padding: 6px;"></div>
+            <div style="flex: 1;"><label style="font-size: 12px;">Hasta:</label><input type="date" id="fechaHasta" onchange="calcularReporteRango()" style="font-size: 13px; padding: 6px;"></div>
+        </div>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-top: 15px; font-size: 15px;">
+            <p>💵 Total en Efectivo: <b id="repEfectivo" style="color: #27ae60; font-size: 16px;">$0</b></p>
+            <p>📱 Total en Transferencia: <b id="repTransf" style="color: #2980b9; font-size: 16px;">$0</b></p>
+            <p>💰 <b>VENTAS TOTALES: <span id="repVentasTotal" style="color: #27ae60;">$0</span></b></p>
+            <p>💸 <b>GASTOS TOTALES: <span id="repGastosTotal" style="color: #c0392b;">$0</span></b></p>
+            <hr style="border: 0; border-top: 2px solid #ddd; margin: 10px 0;">
+            <p style="font-size: 18px;">📈 <b>GANANCIA NETA: <span id="repGananciaNeta" style="color: #2980b9;">$0</span></b></p>
+        </div>
+        <button class="btn" onclick="cerrarReportes()" style="margin-top: 20px; background: #34495e;">Cerrar Ventana</button>
+    </div>
+</div>
+
+<!-- MODAL PLATOS AGOTADOS -->
+<div id="modalStock" class="modal">
+    <div class="modal-box" style="width: 500px;">
+        <h3>🚫 Control de Platos Agotados (Turno Actual)</h3>
+        <div id="listaPlatosStock" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 15px; background: #fdf2f2;"></div>
+        <button class="btn" onclick="cerrarModalStock()" style="background: #c0392b;">Guardar y Cerrar</button>
+    </div>
+</div>
+
+<!-- MODAL PANEL DE CUPONES -->
+<div id="modalPanelCupones" class="modal">
+    <div class="modal-box" style="width: 700px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-bottom: 15px;">
+            <h3 style="margin:0; color: #2c3e50;">🏷️ Cupones de Descuento y Fidelización</h3>
+            <button class="btn" style="width: auto; padding: 6px 12px; background: #2980b9; font-size: 13px; margin-top:0;" onclick="abrirModalCrearCupoAdmin()">+ Crear cupón</button>
+        </div>
+        <table>
+            <thead><tr><th>CÓDIGO / TIPO</th><th>DESCUENTO</th><th>VIGENCIA</th><th>DESTINATARIO</th><th>ACCIONES</th></tr></thead>
+            <tbody id="tablaCuponesAdmin"><tr><td colspan="5" style="text-align:center; padding:15px; color:#777;">No hay cupones creados.</td></tr></tbody>
+        </table>
+        <button class="btn" onclick="cerrarPanelCupones()" style="margin-top: 20px; background: #34495e;">Cerrar Panel</button>
+    </div>
+</div>
+
+<!-- MODAL CREAR CUPÓN -->
+<div id="modalCrearCupoAdmin" class="modal" style="z-index: 10000;">
+    <div class="modal-box">
+        <h3 style="margin-top:0; color: #2c3e50;">Crear Cupón o Beneficio</h3>
+        <div class="form-group"><label>Destinatario:</label><select id="nuevoCupDestinatario"><option value="general">Cupón General</option><option value="primera_compra">🎁 Automático 1era Compra</option></select></div>
+        <div class="form-group"><label>Código:</label><input type="text" id="nuevoCupCodigo" placeholder="Ej: WAYKI10" style="text-transform: uppercase; font-weight: bold;"></div>
+        <div class="form-group"><label>Tipo:</label><select id="nuevoCupTipo"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto Fijo ($)</option></select></div>
+        <div class="form-group"><label>Valor:</label><input type="number" id="nuevoCupValor" placeholder="Ej: 10"></div>
+        <div class="form-group"><label>Días Vigencia:</label><input type="number" id="nuevoCupDias" value="2"></div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn" style="background: #27ae60; margin-top:0;" onclick="guardarNuevoCupoAdmin()">Guardar</button>
+            <button class="btn" onclick="cerrarModalCrearCupoAdmin()" style="background: #7f8c8d; margin-top:0; width: auto;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL BEBIDAS -->
+<div id="modalBebidas" class="modal">
+    <div class="modal-box" style="width: 400px;">
+        <h3>🥤 Seleccionar Bebida del Excel</h3>
+        <div id="listaBebidasModal" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 15px; background: #fdf8f0;"></div>
+        <button class="btn" onclick="cerrarModalBebidas()" style="background: #7f8c8d;">Cerrar</button>
+    </div>
+</div>
+
+<!-- MODAL PROMOS -->
+<div id="modalPromos" class="modal">
+    <div class="modal-box" style="width: 450px;">
+        <h3>🌟 Seleccionar Promo del Excel</h3>
+        <div id="listaPromosModal" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 15px; background: #fef9e7;"></div>
+        <button class="btn" onclick="cerrarModalPromos()" style="background: #7f8c8d;">Cerrar</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="panel left-panel">
+        <div class="brand-logo-container">
+            <div class="brand-logo-title" id="lblLogoNegocio">COMIDAS WAYKI</div>
+            <div class="brand-logo-subtitle" id="lblLogoSubtitulo">Regionales, Saludables y Más</div>
+        </div>
+
+        <div id="seccionAdminExcel" style="background: #eafaf1; border: 1px solid #27ae60; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+            <label style="color: #27ae60; margin-bottom: 5px; font-size: 13px; font-weight: bold;">📁 Menú Semanal por Excel (Lunes a Domingo):</label>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 6px;">
+                <input type="file" id="excelFile" accept=".xlsx, .xls" onchange="cargarExcelVertical(event)" style="font-size: 12px; background: white; flex: 2;">
+                <button type="button" onclick="descargarPlantillaVertical()" style="flex: 1; padding: 6px; background: #2980b9; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">⬇️ Plantilla Menú</button>
+            </div>
+            <div id="estadoExcel" style="font-size: 11px; color: #555;">⚠️ Usando menú base o predeterminado.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #fdf0d5; padding: 8px; border-radius: 6px; border: 1px solid #f39c12; align-items: center;">
+            <div style="flex: 1; font-size: 13px;">📅 Día: <b id="lblDiaActual">-</b></div>
+            <div style="flex: 1; font-size: 13px;">⏰ Turno: 
+                <select id="selectTurnoActual" onchange="renderDatalistProductos()" style="width: auto; padding: 2px; font-weight: bold; font-size: 12px;">
+                    <option value="Mañana">Mañana</option><option value="Noche">Noche</option>
+                </select>
+            </div>
+            <button type="button" onclick="abrirModalStock()" style="background: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold;">🚫 Agotados</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 id="tituloCaja" style="font-size: 18px; margin: 0; border: none;">Caja POS (Nuevo Pedido)</h2>
+        </div>
+        <div class="shortcut-hint">💡 Rol Activo: <b id="lblRolActivoTexto" style="color: #6a0d1b;">Empleado</b> (<span onclick="cerrarSesion()" style="color:#2980b9; cursor:pointer; text-decoration:underline;">Cambiar</span>)</div>
+        
+        <div class="form-group" style="margin-top: 15px;">
+            <label>1. Datos del Cliente</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="clienteNombre" placeholder="Nombre y Apellido" style="flex: 2;">
+                <input type="text" id="clienteCel" placeholder="Celular (Ej: 381...)" style="flex: 1;" oninput="verificarClienteEnBase(this)">
+            </div>
+            <div id="alertaClientePOS" style="font-size: 11px; margin-top: 4px; font-weight: bold;"></div>
+            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <input type="text" id="clienteDireccion" placeholder="Dirección para delivery" style="flex: 2;">
+                <input type="text" id="clienteHorario" placeholder="🕒 Horario (Ej: 1340 o dejar vacío)" style="flex: 1; border-color: #e67e22; background: #fef9e7; font-weight: bold;">
+            </div>
+            <button type="button" class="btn-whatsapp" onclick="enviarWspActualGeneral()">💬 Enviar WhatsApp: "Pedido en camino" 🛵</button>
+        </div>
+
+        <div class="form-group">
+            <label>2. Tipo de Pedido</label>
+            <div class="btn-group">
+                <div id="btnDelivery" class="toggle-btn active" onclick="setTipoPedido('Delivery')">🛵 Delivery</div>
+                <div id="btnMostrador" class="toggle-btn" onclick="setTipoPedido('Mostrador')">🏪 Mostrador</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>3. Medio y Estado de Pago + Vuelto</label>
+            <div class="btn-group">
+                <div id="btnEfectivo" class="toggle-btn active-blue" onclick="setPago('Efectivo')">💵 Efectivo</div>
+                <div id="btnTransferencia" class="toggle-btn" onclick="setTransferencia('Transferencia')">📱 Transferencia</div>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 10px; align-items: center;">
+                <select id="estadoPago" style="background: #fff3cd; font-weight: bold; flex: 2;">
+                    <option value="A COBRAR (Efectivo al entregar)">⚠️ PENDIENTE DE PAGO (Cobrar al entregar)</option>
+                    <option value="PAGADO / TRANSFERENCIA OK">✅ PAGADO / TRANSFERENCIA OK</option>
+                </select>
+                <label style="flex: 1; font-size: 13px; display: flex; align-items: center; gap: 5px; cursor: pointer; background: #eafaf1; padding: 8px; border-radius: 4px; border: 1px solid #27ae60;">
+                    <input type="checkbox" id="checkDineroRecibido" style="width: auto;"> <b>Recibido $</b>
+                </label>
+            </div>
+            <div style="margin-top: 8px; background: #fdf2f2; padding: 8px; border-radius: 4px; border: 1px solid #f5c6cb; display: flex; gap: 10px; align-items: center;">
+                <label style="font-size: 13px; margin: 0; flex: 1; color: #721c24; font-weight: bold;">💵 Paga con ($):</label>
+                <input type="number" id="montoPagaCon" placeholder="Ej: 20000" oninput="calcularVuelto()" style="flex: 1; font-size: 14px; padding: 6px; border: 2px solid #e74c3c; font-weight: bold; background: white;">
+                <div style="flex: 1; font-size: 14px;">Vuelto: <b id="lblVuelto" style="color: #c0392b; font-size: 17px;">$0</b></div>
+            </div>
+        </div>
+
+        <!-- VALIDACIÓN DE CUPÓN -->
+        <div class="form-group" style="background: #eef2ff; padding: 10px; border-radius: 6px; border: 1px solid #6366f1;">
+            <label style="font-size: 13px; color: #4338ca; margin-bottom: 4px;">🏷️ Aplicar Cupón / Beneficio (Validación Antitabuso):</label>
+            <div style="display: flex; gap: 10px;">
+                <select id="selectAplicarCuponVenta" onchange="aplicarDescuentoCuponPOS()" style="flex: 2; font-weight: bold; color: #4338ca;">
+                    <option value="">-- Sin cupón aplicado --</option>
+                </select>
+                <input type="text" id="infoCuponEstadoCel" readonly placeholder="Estado del cliente..." style="flex: 2; font-size: 11px; background: white; text-align: center;">
+            </div>
+        </div>
+
+        <!-- 4. ÍTEMS DEL PEDIDO -->
+        <div class="form-group">
+            <label>4. Ítems del Pedido (Guarniciones independientes por unidad + botón de agregar más guarniciones + escritura libre)</label>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">Cant.</th>
+                        <th style="width: 26%;">Plato / Producto (Escribí libre o elegí)</th>
+                        <th style="width: 12%;">Unitario $</th>
+                        <th style="width: 14%;">Subtotal $</th>
+                        <th style="width: 35%;">Guarniciones / Adicionales (Con precios independientes y + guarnición)</th>
+                        <th style="width: 5%;">X</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTabla"></tbody>
+            </table>
+            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button type="button" onclick="agregarFila()" style="padding: 6px 12px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Agregar Ítem</button>
+                <button type="button" onclick="abrirModalBebidas()" style="padding: 6px 12px; background: #2980b9; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🥤 + Agregar Bebida</button>
+                <button type="button" onclick="abrirModalPromos()" style="padding: 6px 12px; background: #e67e22; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🌟 + Agregar Promo</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Observaciones Generales</label>
+            <textarea id="observaciones" rows="2" placeholder="Ej: Tocar timbre dos veces, etc..."></textarea>
+        </div>
+
+        <div class="form-group" style="display: flex; gap: 10px; align-items: center; background: #fffbeb; padding: 10px; border-radius: 6px; border: 1px solid #f39c12; margin-bottom: 10px;">
+            <label style="font-size: 13px; margin: 0; flex: 1; color: #b45309; font-weight: bold;">🏷️ Descuento Manual ($):</label>
+            <input type="number" id="montoDescuentoManual" value="0" placeholder="Ej: 500" oninput="calcularTotal()" style="flex: 1; font-size: 15px; padding: 6px; border: 2px solid #d97706; font-weight: bold; background: white; color: #b45309;">
+        </div>
+
+        <div class="total-box">Total: $<span id="lblTotal">0</span></div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="btn" id="btnAccionVenta" onclick="cerrarVenta()">🖨️ Cerrar Venta, Imprimir y Enviar a Cocina</button>
+            <button class="btn" id="btnCancelarEdicion" onclick="cancelarEdicion()" style="display:none; background: #7f8c8d; width: auto;">❌ Cancelar Edición</button>
+        </div>
+    </div>
+
+    <!-- PANEL DERECHO -->
+    <div class="panel right-panel">
+        <h3>Ventas de Hoy (Comandas Ordenadas por Urgencia)</h3>
+        <div class="sales-list" id="listaVentas">
+            <p style="color: #7f8c8d; font-size: 13px;">No hay ventas registradas todavía.</p>
+        </div>
+        <div style="margin-top: 15px;">
+            <button onclick="abrirMenuAdmin()" style="background: #2c3e50; color:white; border:none; padding:14px; border-radius:6px; cursor:pointer; font-weight:bold; width:100%; font-size:15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">⚙️ Panel de Administración y Herramientas</button>
+        </div>
+    </div>
+</div>
+
+<!-- TICKET IMPRESIÓN CON SUBTICKET PARA DELIVERY -->
+<div id="ticket-impresion" style="display:none;">
+    <div style="text-align: center; margin-bottom: 5px; color: #000;">
+        <div style="font-size: 22px; font-weight: bold;" id="t-nombre-negocio">COMIDAS WAYKI</div>
+        <div style="font-size: 12px; font-weight: bold;" id="t-sub-negocio">Regionales, Saludables y Más</div>
+    </div>
+    <div style="text-align: center; font-size: 13px; font-weight: bold;" id="t-dir-negocio">Asunción 629</div>
+    <div style="text-align: center; border-bottom: 2px dashed #000; margin: 6px 0;"></div>
+    <div style="font-size: 26px; text-align: center; font-weight: bold;">PEDIDO #<span id="t-nro"></span></div>
+    <div style="font-size: 14px;"><b>Hora / Horario:</b> <span id="t-fecha"></span></div>
+    <div style="font-size: 14px;"><b>Cliente:</b> <span id="t-cliente"></span></div>
+    <div style="font-size: 14px;"><b>Tel:</b> <span id="t-tel"></span></div>
+    <div style="font-size: 14px;"><b>Dirección:</b> <span id="t-dir"></span></div>
+    <div style="font-size: 14px;" id="t-box-obs"><b>Obs:</b> <span id="t-obs" style="font-weight: bold;"></span></div>
+    <div style="text-align: center; border-bottom: 2px dashed #000; margin: 6px 0;"></div>
+    <div style="font-size: 15px; font-weight: bold;">DETALLE:</div>
+    <div id="t-items" style="font-size: 14px; margin-top: 6px;"></div>
+    <div style="text-align: center; border-bottom: 2px dashed #000; margin: 6px 0;"></div>
+    <div style="font-size: 15px;"><b>ESTADO DE PAGO:</b><br><span id="t-pago" style="font-size: 16px; font-weight: bold;"></span></div>
+    <div style="font-size: 15px; margin-top: 5px;"><b>MÉTODO:</b> <span id="t-medio-pago"></span></div>
+    <div style="font-size: 15px;" id="t-box-vuelto"><b>PAGA CON:</b> $<span id="t-pagacon"></span> | <b>VUELTO:</b> <span id="t-vuelto" style="color:#000; font-weight:bold;"></span></div>
+    <div style="text-align: center; font-size: 24px; font-weight: bold; margin-top: 8px;">TOTAL: $<span id="t-total"></span></div>
+
+    <!-- LÍNEA DE CORTE Y SUBTICKET EXCLUSIVO PARA EL DELIVERY -->
+    <div style="text-align: center; border-bottom: 3px dashed #000; margin: 15px 0 10px 0; position: relative;"><span style="background: #fff; padding: 0 5px; font-size: 10px; position: relative; top: 6px;">✂️ --- CORTAR ACÁ PARA DELIVERY --- ✂️</span></div>
+    <div style="text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 4px;">WAYKI - CUPÓN DELIVERY</div>
+    <div style="font-size: 18px; font-weight: bold; text-align: center;">PEDIDO #<span id="sub-t-nro"></span></div>
+    <div style="font-size: 14px; margin-top: 4px;"><b>Cliente:</b> <span id="sub-t-cliente"></span></div>
+    <div style="font-size: 14px;"><b>Tel:</b> <span id="sub-t-tel"></span></div>
+    <div style="font-size: 15px; font-weight: bold; margin-top: 4px;"><b>Dirección:</b> <span id="sub-t-dir"></span></div>
+    <div style="font-size: 14px; margin-top: 4px;" id="sub-t-box-obs"><b>Obs:</b> <span id="sub-t-obs" style="font-weight: bold; text-decoration: underline;"></span></div>
+    <div style="font-size: 14px; margin-top: 6px; padding: 4px; border: 1px solid #000; text-align: center;">
+        <span id="sub-t-instruccion-cobro" style="font-size: 15px; font-weight: bold;"></span>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCEuKDbrqXTfMM7Z6PLpTB6TsVCvvHWq_o",
+        authDomain: "wayki-cocina.firebaseapp.com",
+        projectId: "wayki-cocina",
+        storageBucket: "wayki-cocina.firebasestorage.app",
+        messagingSenderId: "750389109772",
+        appId: "1:750389109772:web:b8d290bf5dbc1fd339fa29"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let rolActual = 'empleado';
+    let configNegocio = { nombre: 'COMIDAS WAYKI', subtitulo: 'Regionales y Saludables', direccion: 'Asunción 629', telefono: '3812108471', passwordAdmin: 'admin123' };
+    let tipoPedidoActual = 'Delivery';
+    let medioPagoActual = 'Efectivo';
+    let ventasHoy = [], todasLasVentasHistoricas = [], baseClientes = [], gastosRegistrados = [], cuponesConfigurados = [], platosAgotados = [];
+    let editandoId = null, menuVerticalExcel = null;
+    let estadosCocinaAnteriores = {};
+
+    try {
+        let conf = JSON.parse(localStorage.getItem('wayki_config_negocio')); if(conf) configNegocio = conf;
+        menuVerticalExcel = JSON.parse(localStorage.getItem('wayki_menu_vertical')) || null;
+        baseClientes = JSON.parse(localStorage.getItem('wayki_base_clientes')) || [];
+        gastosRegistrados = JSON.parse(localStorage.getItem('wayki_gastos')) || [];
+        platosAgotados = JSON.parse(localStorage.getItem('wayki_agotados')) || [];
+    } catch(e){}
+
+    // ACTIVACIÓN AUTOMÁTICA DE AUDIO Y CARGA AL ABRIR EL PROGRAMA
+    window.addEventListener('DOMContentLoaded', () => {
+        aplicarConfigNegocioEnInterfaz();
+        detectarDiaYTurno();
+        agregarFila();
+        intentarReproducirAudioAutomaticoPOS();
+
+        db.ref('wayki_ventas').on('value', (snapshot) => {
+            let data = snapshot.val();
+            let nuevasVentas = data ? (Array.isArray(data) ? data.filter(v => v !== null) : Object.values(data)) : [];
+
+            // Detectar si la cocina cambió el estado a "Listo" para sonar la bocina en la PC
+            nuevasVentas.forEach(v => {
+                let estadoActualCocina = v.estadoCocina || 'Pendiente';
+                if (estadosCocinaAnteriores[v.id] !== undefined && estadosCocinaAnteriores[v.id] === 'Pendiente' && estadoActualCocina === 'Listo') {
+                    sonarAlarmaPOS();
+                }
+                estadosCocinaAnteriores[v.id] = estadoActualCocina;
+            });
+
+            ventasHoy = nuevasVentas;
+            todasLasVentasHistoricas = ventasHoy;
+            actualizarBaseClientesAutomatica();
+            renderVentas();
+            poblarSelectCuponesVenta();
+        });
+
+        // Sintonizar estadoCocina con wayki_cocina sin alterar la marca de entregado del POS
+        db.ref('wayki_cocina').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if (data) {
+                let listaCocina = Array.isArray(data) ? data.filter(p => p !== null) : Object.values(data);
+                let huboCambio = false;
+                ventasHoy.forEach(v => {
+                    let pCocina = listaCocina.find(p => p.id == v.id);
+                    if (pCocina) {
+                        if (pCocina.estadoCocina && pCocina.estadoCocina !== v.estadoCocina) {
+                            if (v.estadoCocina === 'Pendiente' && pCocina.estadoCocina === 'Listo') sonarAlarmaPOS();
+                            v.estadoCocina = pCocina.estadoCocina;
+                            huboCambio = true;
+                        }
+                    }
+                });
+                if (huboCambio) db.ref('wayki_ventas').set(ventasHoy);
+            }
+        });
+
+        db.ref('wayki_config_web/baseClientes').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if(data) { baseClientes = data; localStorage.setItem('wayki_base_clientes', JSON.stringify(data)); }
+        });
+
+        db.ref('wayki_config_web/gastos').on('value', (snapshot) => {
+            let data = snapshot.val();
+            if(data) { gastosRegistrados = data; localStorage.setItem('wayki_gastos', JSON.stringify(data)); }
+        });
+
+        db.ref('wayki_config_web/cuponesCustom').on('value', (snapshot) => {
+            let data = snapshot.val();
+            cuponesConfigurados = data ? (Array.isArray(data) ? data.filter(c => c !== null) : Object.values(data)) : [];
+            poblarSelectCuponesVenta();
+        });
+    });
+
+    function intentarReproducirAudioAutomaticoPOS() {
+        let audio = document.getElementById('audioAlarmaPOS');
+        if (audio) {
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+            }).catch(e => {
+                window.addEventListener('click', () => {
+                    audio.play().then(() => { audio.pause(); audio.currentTime = 0; });
+                }, { once: true });
+            });
+        }
+    }
+
+    function sonarAlarmaPOS() {
+        let audio = document.getElementById('audioAlarmaPOS');
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(err => console.log(err));
+        }
+    }
+
+    function togglePasswordCampo() { document.getElementById('grupoPassword').style.display = (document.getElementById('loginRol').value === 'admin') ? 'block' : 'none'; }
+    
+    function ejecutarLogin() {
+        let rol = document.getElementById('loginRol').value;
+        if(rol === 'admin' && document.getElementById('loginPass').value.trim() !== (configNegocio.passwordAdmin || 'admin123')) { alert('Contraseña incorrecta'); return; }
+        rolActual = rol;
+        document.getElementById('pantallaLogin').style.display = 'none';
+        document.getElementById('lblRolActivoTexto').innerText = rol === 'admin' ? 'Administrador 🔒' : 'Empleado 👤';
+    }
+    function cerrarSesion() { location.reload(); }
+
+    function aplicarConfigNegocioEnInterfaz() {
+        document.getElementById('loginTituloNegocio').innerText = configNegocio.nombre;
+        document.getElementById('lblLogoNegocio').innerText = configNegocio.nombre;
+        document.getElementById('lblLogoSubtitulo').innerText = configNegocio.subtitulo;
+    }
+
+    function abrirMenuAdmin() {
+        if(rolActual !== 'admin') { alert('Acceso restringido solo para administradores.'); return; }
+        document.getElementById('modalMenuAdmin').style.display = 'flex';
+    }
+    function cerrarMenuAdmin() { document.getElementById('modalMenuAdmin').style.display = 'none'; }
+
+    function abrirConfiguracionNegocio() {
+        document.getElementById('confNombreNegocio').value = configNegocio.nombre;
+        document.getElementById('confSubtitulo').value = configNegocio.subtitulo;
+        document.getElementById('confDireccion').value = configNegocio.direccion;
+        document.getElementById('confTelefono').value = configNegocio.telefono;
+        document.getElementById('confPasswordAdmin').value = configNegocio.passwordAdmin;
+        document.getElementById('modalConfiguracion').style.display = 'flex';
+    }
+    function cerrarModalConfiguracion() { document.getElementById('modalConfiguracion').style.display = 'none'; }
+    function guardarConfiguracionNegocio() {
+        configNegocio = {
+            nombre: document.getElementById('confNombreNegocio').value.trim(),
+            subtitulo: document.getElementById('confSubtitulo').value.trim(),
+            direccion: document.getElementById('confDireccion').value.trim(),
+            telefono: document.getElementById('confTelefono').value.trim(),
+            passwordAdmin: document.getElementById('confPasswordAdmin').value.trim() || 'admin123'
+        };
+        localStorage.setItem('wayki_config_negocio', JSON.stringify(configNegocio));
+        aplicarConfigNegocioEnInterfaz();
+        cerrarModalConfiguracion();
+        alert('Configuración guardada!');
+    }
+
+    function abrirModalGastos() {
+        renderTablaGastos();
+        document.getElementById('modalGastos').style.display = 'flex';
+    }
+    function cerrarModalGastos() { document.getElementById('modalGastos').style.display = 'none'; }
+
+    function agregarGasto() {
+        let concepto = document.getElementById('gastoConcepto').value.trim();
+        let monto = parseFloat(document.getElementById('gastoMonto').value) || 0;
+        if(!concepto || monto <= 0) { alert('Ingrese un concepto y un monto válido.'); return; }
+
+        let nuevoGasto = {
+            id: Date.now(),
+            fechaYyyyMmDd: new Date().toISOString().slice(0, 10),
+            fechaTexto: new Date().toLocaleDateString(),
+            concepto,
+            monto
+        };
+        gastosRegistrados.push(nuevoGasto);
+        db.ref('wayki_config_web/gastos').set(gastosRegistrados);
+        localStorage.setItem('wayki_gastos', JSON.stringify(gastosRegistrados));
+        document.getElementById('gastoConcepto').value = '';
+        document.getElementById('gastoMonto').value = '';
+        renderTablaGastos();
+    }
+
+    function eliminarGasto(id) {
+        if(confirm('¿Eliminar este gasto?')) {
+            gastosRegistrados = gastosRegistrados.filter(g => g.id !== id);
+            db.ref('wayki_config_web/gastos').set(gastosRegistrados);
+            localStorage.setItem('wayki_gastos', JSON.stringify(gastosRegistrados));
+            renderTablaGastos();
+        }
+    }
+
+    function renderTablaGastos() {
+        let tbody = document.getElementById('tablaGastosAdmin');
+        let totalGastos = 0;
+        if(gastosRegistrados.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:15px; color:#777;">No hay gastos registrados.</td></tr>`;
+            document.getElementById('lblTotalGastos').innerText = '$0';
+            return;
+        }
+        let html = '';
+        gastosRegistrados.slice().reverse().forEach(g => {
+            totalGastos += g.monto;
+            html += `<tr><td>${g.fechaTexto}</td><td><b>${g.concepto}</b></td><td style="color:#c0392b; font-weight:bold;">$${g.monto}</td><td><button class="btn btn-danger" onclick="eliminarGasto(${g.id})">🗑️</button></td></tr>`;
+        });
+        tbody.innerHTML = html;
+        document.getElementById('lblTotalGastos').innerText = '$' + totalGastos;
+    }
+
+    function actualizarBaseClientesAutomatica() {
+        ventasHoy.forEach(v => {
+            if(v.nombre && v.cel) {
+                let celLimpio = v.cel.replace(/\D/g, '');
+                let existente = baseClientes.find(c => c.cel && c.cel.replace(/\D/g, '') === celLimpio);
+                if(existente) {
+                    existente.nombre = v.nombre;
+                    existente.direccion = v.dir || existente.direccion;
+                    existente.ultimoPedido = v.fechaTexto || new Date().toLocaleDateString();
+                    existente.fechaUltimoIso = v.fechaYyyyMmDd || new Date().toISOString().slice(0, 10);
+                } else {
+                    baseClientes.push({ nombre: v.nombre, cel: v.cel, direccion: v.dir || '', ultimoPedido: v.fechaTexto || new Date().toLocaleDateString(), fechaUltimoIso: v.fechaYyyyMmDd || new Date().toISOString().slice(0, 10) });
+                }
+            }
+        });
+        db.ref('wayki_config_web/baseClientes').set(baseClientes);
+        localStorage.setItem('wayki_base_clientes', JSON.stringify(baseClientes));
+    }
+
+    function verificarClienteEnBase(inputCel) {
+        let celIngresado = inputCel.value.replace(/\D/g, '');
+        let aviso = document.getElementById('alertaClientePOS');
+        let estadoCelInput = document.getElementById('infoCuponEstadoCel');
+        if(celIngresado.length < 5) { aviso.innerHTML = ''; estadoCelInput.value = ''; return; }
+
+        let clienteEncontrado = baseClientes.find(c => c.cel && c.cel.replace(/\D/g, '') === celIngresado);
+        let comprasPrevias = todasLasVentasHistoricas.filter(v => v.cel && v.cel.replace(/\D/g, '') === celIngresado);
+
+        if(clienteEncontrado) {
+            document.getElementById('clienteNombre').value = clienteEncontrado.nombre;
+            document.getElementById('clienteDireccion').value = clienteEncontrado.direccion;
+        }
+
+        if (comprasPrevias.length === 0) {
+            aviso.innerHTML = '✨ Cliente NUEVO (Apto para cupón)'; aviso.style.color = '#16a34a';
+            estadoCelInput.value = 'Cliente Nuevo (Sin uso previo)';
+        } else {
+            let cuponUsadoPreviamente = comprasPrevias.some(v => v.cuponUsado && v.cuponUsado !== 'Ninguno');
+            if (cuponUsadoPreviamente) {
+                aviso.innerHTML = `⚠️ Cliente FRECUENTE - Ya usó cupón antes.`; aviso.style.color = '#d97706';
+                estadoCelInput.value = '⚠️ Ya usó cupón anteriormente';
+            } else {
+                aviso.innerHTML = `✅ Cliente Frecuente (${comprasPrevias.length} compras)`; aviso.style.color = '#2563eb';
+                estadoCelInput.value = 'Cliente Frecuente (Sin cupón previo)';
+            }
+        }
+    }
+
+    function poblarSelectCuponesVenta() {
+        let select = document.getElementById('selectAplicarCuponVenta');
+        let html = `<option value="">-- Sin cupón aplicado --</option>`;
+        cuponesConfigurados.forEach(c => {
+            let desc = c.tipo === 'porcentaje' ? `${c.valor}% OFF` : `$${c.valor} OFF`;
+            html += `<option value="${c.codigo}" data-tipo="${c.tipo}" data-valor="${c.valor}">${c.codigo} (${desc})</option>`;
+        });
+        select.innerHTML = html;
+    }
+
+    function aplicarDescuentoCuponPOS() {
+        let select = document.getElementById('selectAplicarCuponVenta');
+        let optionSel = select.options[select.selectedIndex];
+        let codigoSeleccionado = select.value;
+        if (!codigoSeleccionado) { document.getElementById('montoDescuentoManual').value = 0; calcularTotal(); return; }
+
+        let tipo = optionSel.getAttribute('data-tipo');
+        let valor = parseFloat(optionSel.getAttribute('data-valor')) || 0;
+        let subtotal = 0;
+        document.querySelectorAll('#itemsTabla tr').forEach(fila => {
+            let cant = parseFloat(fila.querySelector('.item-cant').value) || 0;
+            let precioUni = parseFloat(fila.querySelector('.item-precio').value) || 0;
+            let extras = 0;
+            fila.querySelectorAll('.item-guarnicion-precio').forEach(inpPrecio => {
+                extras += parseFloat(inpPrecio.value) || 0;
+            });
+            subtotal += (cant * precioUni) + extras;
+        });
+
+        let montoDesc = (tipo === 'porcentaje') ? Math.round((subtotal * valor) / 100) : valor;
+        document.getElementById('montoDescuentoManual').value = montoDesc;
+        calcularTotal();
+    }
+
+    function cargarExcelVertical(event) {
+        let file = event.target.files[0]; if(!file) return;
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            let data = new Uint8Array(e.target.result);
+            let workbook = XLSX.read(data, {type: 'array'});
+            menuVerticalExcel = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
+            db.ref('wayki_config_web/menuVerticalExcel').set(menuVerticalExcel);
+            localStorage.setItem('wayki_menu_vertical', JSON.stringify(menuVerticalExcel));
+            document.getElementById('estadoExcel').innerText = "✅ Menú semanal cargado y sincronizado.";
+            alert('¡Menú cargado y sincronizado con éxito!'); renderDatalistProductos();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function descargarPlantillaVertical() {
+        let wb = XLSX.utils.book_new();
+        let wsData = [
+            ["Lunes Mañana", "Precio L.M.", "Lunes Noche", "Precio L.N.", "Martes Mañana", "Precio M.M.", "Martes Noche", "Precio M.N.", "Miércoles Mañana", "Precio Mi.M.", "Miércoles Noche", "Precio Mi.N.", "Jueves Mañana", "Precio J.M.", "Jueves Noche", "Precio J.N.", "Viernes Mañana", "Precio V.M.", "Viernes Noche", "Precio V.N.", "Sábado Mañana", "Precio S.M.", "Sábado Noche", "Precio S.N.", "Domingo Mañana", "Precio D.M.", "Domingo Noche", "Precio D.N.", "Promos", "Precio Promo", "Salsas y Adicionales", "Precio Adicional", "Bebidas", "Precio Bebida"],
+            ["Milanesa c/ Guarnición", 13200, "Pizza Muzza", 9000, "Milanesa a la Suiza", 14500, "Tartas", 7500, "Suprema", 13000, "Empanadas", 11000, "Guiso", 12000, "Pizzetas", 8000, "Napolitana", 15500, "Lomitos", 14500, "Asado", 16000, "Picadas", 12000, "Locro", 17000, "Minutas", 9000, "Promo Familiar", 22000, "Salsa Roja", 0, "Gaseosa 1.5L", 3000]
+        ];
+        let ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "MenuWaykiCompleto");
+        XLSX.writeFile(wb, "Plantilla_Semanal_Lunes_Domingo.xlsx");
+    }
+
+    function detectarDiaYTurno() {
+        const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+        const hoy = new Date();
+        document.getElementById('lblDiaActual').innerText = dias[hoy.getDay()].charAt(0).toUpperCase() + dias[hoy.getDay()].slice(1);
+        document.getElementById('selectTurnoActual').value = (hoy.getHours() >= 16) ? 'Noche' : 'Mañana';
+    }
+
+    function obtenerListasActuales() {
+        let diaStr = document.getElementById('lblDiaActual').innerText.toLowerCase();
+        let turnoStr = document.getElementById('selectTurnoActual').value.toLowerCase();
+        let platos = [], salsas = [], bebidas = [], promos = [];
+        
+        if (!menuVerticalExcel || menuVerticalExcel.length < 2) {
+            return {
+                platos: [{nombre: 'Milanesa c/ Guarnición', precio: 13200}, {nombre: 'Suprema', precio: 13000}, {nombre: 'Bombas de Carne', precio: 8500}],
+                salsas: [{nombre: 'Salsa Roja', precio: 0}, {nombre: 'Puré', precio: 1000}, {nombre: 'Papas Fritas', precio: 2000}, {nombre: 'Arroz', precio: 0}],
+                bebidas: [{nombre: 'Gaseosa 1.5L', precio: 3000}],
+                promos: [{nombre: 'Promo Familiar', precio: 22000}]
+            };
+        }
+
+        let headers = menuVerticalExcel[0].map(h => h ? h.toString().toLowerCase().trim() : '');
+        let colIdx = -1;
+
+        headers.forEach((h, idx) => {
+            let matchDia = h.includes(diaStr) || (diaStr.includes('miérc') && h.includes('miér')) || (diaStr.includes('sáb') && h.includes('sáb'));
+            let matchTurno = h.includes(turnoStr);
+            if (matchDia && matchTurno) colIdx = idx;
+        });
+
+        if (colIdx === -1) {
+            headers.forEach((h, idx) => { if (h.includes(diaStr)) colIdx = idx; });
+        }
+        if (colIdx === -1) colIdx = 0;
+
+        let salsaIdx = headers.findIndex(h => h.includes('salsa') || h.includes('adicional'));
+        let bebidaIdx = headers.findIndex(h => h.includes('bebida') || h.includes('gaseosa'));
+        let promoIdx = headers.findIndex(h => h.includes('promo'));
+
+        for (let i = 1; i < menuVerticalExcel.length; i++) {
+            let row = menuVerticalExcel[i];
+            if (row[colIdx]) {
+                let nom = row[colIdx].toString().trim();
+                let precioPlato = parseFloat(row[colIdx + 1]) || 0;
+                if (nom && !platosAgotados.includes(nom)) platos.push({ nombre: nom, precio: precioPlato });
+            }
+            if (salsaIdx !== -1 && row[salsaIdx]) {
+                let nomSalsa = row[salsaIdx].toString().trim();
+                let precioSalsa = parseFloat(row[salsaIdx + 1]) || 0;
+                if(nomSalsa) salsas.push({ nombre: nomSalsa, precio: precioSalsa });
+            }
+            if (bebidaIdx !== -1 && row[bebidaIdx]) {
+                let nomBebida = row[bebidaIdx].toString().trim();
+                let precioBebida = parseFloat(row[bebidaIdx + 1]) || 0;
+                if(nomBebida) bebidas.push({ nombre: nomBebida, precio: precioBebida });
+            }
+            if (promoIdx !== -1 && row[promoIdx]) {
+                let nomPromo = row[promoIdx].toString().trim();
+                let precioPromo = parseFloat(row[promoIdx + 1]) || 0;
+                if(nomPromo) promos.push({ nombre: nomPromo, precio: precioPromo });
+            }
+        }
+
+        if (salsas.length === 0) salsas = [{nombre: 'Salsa Roja', precio: 0}];
+        if (bebidas.length === 0) bebidas = [{nombre: 'Gaseosa 1.5L', precio: 3000}];
+        if (promos.length === 0) promos = [{nombre: 'Promo Familiar', precio: 22000}];
+
+        return { platos, salsas, bebidas, promos };
+    }
+
+    function renderDatalistProductos() {
+        let datos = obtenerListasActuales();
+        document.querySelectorAll('.lista-productos-datalist').forEach(dl => {
+            let html = ''; datos.platos.forEach(p => html += `<option value="${p.nombre}">`); dl.innerHTML = html;
+        });
+        document.querySelectorAll('.lista-guarniciones-datalist').forEach(dl => {
+            let html = ''; datos.salsas.forEach(s => html += `<option value="${s.nombre}" data-precio="${s.precio}">`); dl.innerHTML = html;
+        });
+    }
+
+    function seleccionarProducto(inputElem) {
+        let fila = inputElem.closest('tr');
+        let encontrado = obtenerListasActuales().platos.find(p => p.nombre.toLowerCase() === inputElem.value.toLowerCase());
+        if(encontrado) fila.querySelector('.item-precio').value = encontrado.precio;
+        calcularSubtotalFila(fila);
+    }
+
+    function seleccionarGuarnicionLibre(inputGuarn) {
+        let fila = inputGuarn.closest('tr');
+        let datalist = document.getElementById(inputGuarn.getAttribute('list'));
+        if (datalist) {
+            let val = inputGuarn.value.toLowerCase();
+            let datos = obtenerListasActuales();
+            let encontrada = datos.salsas.find(s => s.nombre.toLowerCase() === val);
+            if (encontrada) {
+                let precioInput = inputGuarn.parentNode.querySelector('.item-guarnicion-precio');
+                if(precioInput) precioInput.value = encontrada.precio;
+            }
+        }
+        calcularSubtotalFila(fila);
+    }
+
+    function abrirModalBebidas() {
+        let contenedor = document.getElementById('listaBebidasModal');
+        let datos = obtenerListasActuales();
+        let html = '';
+        datos.bebidas.forEach(b => {
+            html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #eee; font-size: 13px;">
+                <span><b>${b.nombre}</b> ($${b.precio})</span>
+                <button class="btn" style="width: auto; padding: 4px 8px; font-size: 11px; margin-top:0; background:#27ae60;" onclick="agregarItemDirecto('${b.nombre.replace(/'/g, "\\'")}', ${b.precio})">Agregar</button>
+            </div>`;
+        });
+        contenedor.innerHTML = html;
+        document.getElementById('modalBebidas').style.display = 'flex';
+    }
+    function cerrarModalBebidas() { document.getElementById('modalBebidas').style.display = 'none'; }
+
+    function abrirModalPromos() {
+        let contenedor = document.getElementById('listaPromosModal');
+        let datos = obtenerListasActuales();
+        let html = '';
+        datos.promos.forEach(pr => {
+            html += `<div style="display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #eee; font-size: 13px;">
+                <span><b>${pr.nombre}</b> ($${pr.precio})</span>
+                <button class="btn" style="width: auto; padding: 4px 8px; font-size: 11px; margin-top:0; background:#e67e22;" onclick="agregarItemDirecto('${pr.nombre.replace(/'/g, "\\'")}', ${pr.precio})">Agregar</button>
+            </div>`;
+        });
+        contenedor.innerHTML = html;
+        document.getElementById('modalPromos').style.display = 'flex';
+    }
+    function cerrarModalPromos() { document.getElementById('modalPromos').style.display = 'none'; }
+
+    function agregarItemDirecto(nombre, precio) {
+        agregarFila({ cantidad: 1, nombre: nombre, precio: precio, guarnicionesArr: [] });
+        cerrarModalBebidas(); cerrarModalPromos();
+    }
+
+    function actualizarGuarnicionesSegunCantidad(inputCant) {
+        let fila = inputCant.closest('tr');
+        let cant = parseInt(inputCant.value) || 1;
+        if(cant < 1) cant = 1;
+        inputCant.value = cant;
+
+        let container = fila.querySelector('.guarniciones-container');
+        let datos = obtenerListasActuales();
+        let datalistGuarnId = container.getAttribute('data-datalist-id');
+
+        let bloquesUnidad = Array.from(container.querySelectorAll('.unidad-guarniciones-bloque'));
+        
+        container.innerHTML = '';
+        for(let i = 0; i < cant; i++) {
+            let bloqueAnterior = bloquesUnidad[i];
+            
+            let divBloque = document.createElement('div');
+            divBloque.className = "unidad-guarniciones-bloque";
+            divBloque.style.cssText = "border-bottom: 1px dashed #ddd; padding-bottom: 4px; margin-bottom: 4px;";
+            
+            let htmlGuarns = `<div style="font-size:11px; font-weight:bold; color:#6a0d1b; margin-bottom:2px;">Unidad ${i+1}:</div>`;
+            
+            if (bloqueAnterior) {
+                divBloque.innerHTML = htmlGuarns;
+                let filasPrevias = bloqueAnterior.querySelectorAll('.guarnicion-row');
+                let subContainer = document.createElement('div');
+                filasPrevias.forEach(fp => {
+                    subContainer.appendChild(fp.cloneNode(true));
+                });
+                divBloque.appendChild(subContainer);
+            } else {
+                let defaultGuarn = datos.salsas[0] ? datos.salsas[0].nombre : '';
+                let defaultPrecio = datos.salsas[0] ? datos.salsas[0].precio : 0;
+                divBloque.innerHTML = htmlGuarns + `
+                    <div class="sub-guarniciones-lista">
+                        <div class="guarnicion-row" style="display:flex; gap:4px; margin-bottom:3px; align-items:center;">
+                            <input type="text" list="${datalistGuarnId}" value="${defaultGuarn}" placeholder="Guarnición..." class="item-guarnicion-input" style="font-size:11px; padding:3px; flex:2;" oninput="seleccionarGuarnicionLibre(this)">
+                            <input type="number" value="${defaultPrecio}" placeholder="$Extra" class="item-guarnicion-precio" style="font-size:11px; padding:3px; flex:1;" oninput="calcularSubtotalFila(this.closest('tr'))" title="Precio extra">
+                        </div>
+                    </div>
+                `;
+            }
+
+            let btnMas = document.createElement('button');
+            btnMas.type = "button";
+            btnMas.className = "btn";
+            btnMas.style.cssText = "background:#2980b9; padding:2px 6px; font-size:10px; margin-top:2px; width:auto;";
+            btnMas.innerText = "+ Agregar otra guarnición";
+            btnMas.onclick = function() {
+                let subList = divBloque.querySelector('.sub-guarniciones-lista') || divBloque;
+                let rowExtra = document.createElement('div');
+                rowExtra.className = "guarnicion-row";
+                rowExtra.style.cssText = "display:flex; gap:4px; margin-bottom:3px; align-items:center;";
+                rowExtra.innerHTML = `
+                    <input type="text" list="${datalistGuarnId}" value="" placeholder="Otra guarnición..." class="item-guarnicion-input" style="font-size:11px; padding:3px; flex:2;" oninput="seleccionarGuarnicionLibre(this)">
+                    <input type="number" value="0" placeholder="$Extra" class="item-guarnicion-precio" style="font-size:11px; padding:3px; flex:1;" oninput="calcularSubtotalFila(this.closest('tr'))">
+                    <button type="button" class="btn-danger" style="padding:2px 4px; font-size:10px;" onclick="this.parentNode.remove(); calcularSubtotalFila(this.closest('tr'))">X</button>
+                `;
+                subList.appendChild(rowExtra);
+                calcularSubtotalFila(fila);
+            };
+
+            divBloque.appendChild(btnMas);
+            container.appendChild(divBloque);
+        }
+        calcularSubtotalFila(fila);
+    }
+
+    function calcularSubtotalFila(fila) {
+        let cant = parseFloat(fila.querySelector('.item-cant').value) || 0;
+        let precioUni = parseFloat(fila.querySelector('.item-precio').value) || 0;
+        let extrasPrecioTotal = 0;
+
+        fila.querySelectorAll('.guarnicion-row').forEach(row => {
+            let precioGuarn = parseFloat(row.querySelector('.item-guarnicion-precio').value) || 0;
+            extrasPrecioTotal += precioGuarn;
+        });
+
+        let subtotal = (cant * precioUni) + extrasPrecioTotal;
+        fila.querySelector('.item-subtotal-txt').innerText = '$' + subtotal;
+        calcularTotal();
+    }
+
+    function agregarFila(itemData = null) {
+        let tbody = document.getElementById('itemsTabla');
+        let tr = document.createElement('tr');
+        let datalistPlatoId = 'dl_plato_' + Math.random().toString(36).substr(2, 9);
+        let datalistGuarnId = 'dl_guarn_' + Math.random().toString(36).substr(2, 9);
+        let datos = obtenerListasActuales();
+
+        let optsPlatos = ''; datos.platos.forEach(p => optsPlatos += `<option value="${p.nombre}">`);
+        let optsGuarn = ''; datos.salsas.forEach(s => optsGuarn += `<option value="${s.nombre}" data-precio="${s.precio}">`);
+
+        let cant = itemData ? itemData.cantidad : 1;
+        let nombre = itemData ? itemData.nombre : '';
+        let precio = itemData ? itemData.precio : '';
+
+        tr.innerHTML = `
+            <td><input type="number" value="${cant}" min="1" class="item-cant" style="width:100%" oninput="actualizarGuarnicionesSegunCantidad(this)"></td>
+            <td>
+                <input type="text" list="${datalistPlatoId}" value="${nombre}" placeholder="🔍 Plato o escribir libre..." class="item-nombre" style="width:100%" oninput="seleccionarProducto(this)">
+                <datalist id="${datalistPlatoId}" class="lista-productos-datalist">${optsPlatos}</datalist>
+            </td>
+            <td><input type="number" value="${precio}" placeholder="0" class="item-precio" style="width:100%" oninput="calcularSubtotalFila(this.closest('tr'))"></td>
+            <td><b class="item-subtotal-txt" style="color:#27ae60; font-size:14px;">$0</b></td>
+            <td>
+                <div class="guarniciones-container" data-datalist-id="${datalistGuarnId}"></div>
+                <datalist id="${datalistGuarnId}" class="lista-guarniciones-datalist">${optsGuarn}</datalist>
+            </td>
+            <td><button class="btn-danger" onclick="this.closest('tr').remove(); calcularTotal();">X</button></td>
+        `;
+        tbody.appendChild(tr);
+
+        actualizarGuarnicionesSegunCantidad(tr.querySelector('.item-cant'));
+
+        if (itemData && itemData.guarnicionesArr && itemData.guarnicionesArr.length > 0) {
+            let bloques = tr.querySelectorAll('.unidad-guarniciones-bloque');
+            itemData.guarnicionesArr.forEach((unidadGuarns, idx) => {
+                if (bloques[idx] && Array.isArray(unidadGuarns)) {
+                    let subList = bloques[idx].querySelector('.sub-guarniciones-lista') || bloques[idx];
+                    subList.innerHTML = '';
+                    unidadGuarns.forEach((g, gIdx) => {
+                        let rowExtra = document.createElement('div');
+                        let btnDel = gIdx > 0 ? `<button type="button" class="btn-danger" style="padding:2px 4px; font-size:10px;" onclick="this.parentNode.remove(); calcularSubtotalFila(this.closest('tr'))">X</button>` : '';
+                        rowExtra.className = "guarnicion-row";
+                        rowExtra.style.cssText = "display:flex; gap:4px; margin-bottom:3px; align-items:center;";
+                        rowExtra.innerHTML = `
+                            <input type="text" list="${datalistGuarnId}" value="${g.nombre || g}" placeholder="Guarnición..." class="item-guarnicion-input" style="font-size:11px; padding:3px; flex:2;" oninput="seleccionarGuarnicionLibre(this)">
+                            <input type="number" value="${g.precio !== undefined ? g.precio : 0}" placeholder="$Extra" class="item-guarnicion-precio" style="font-size:11px; padding:3px; flex:1;" oninput="calcularSubtotalFila(this.closest('tr'))">
+                            ${btnDel}
+                        `;
+                        subList.appendChild(rowExtra);
+                    });
+                }
+            });
+            calcularSubtotalFila(tr);
+        }
+    }
+
+    function calcularTotal() {
+        let subtotal = 0;
+        document.querySelectorAll('#itemsTabla tr').forEach(fila => {
+            let cant = parseFloat(fila.querySelector('.item-cant').value) || 0;
+            let precioUni = parseFloat(fila.querySelector('.item-precio').value) || 0;
+            let extrasPrecioTotal = 0;
+            fila.querySelectorAll('.guarnicion-row').forEach(row => {
+                let precioGuarn = parseFloat(row.querySelector('.item-guarnicion-precio').value) || 0;
+                extrasPrecioTotal += precioGuarn;
+            });
+            subtotal += (cant * precioUni) + extrasPrecioTotal;
+        });
+        let desc = parseFloat(document.getElementById('montoDescuentoManual').value) || 0;
+        let total = subtotal - desc; if(total < 0) total = 0;
+        document.getElementById('lblTotal').innerText = total;
+        calcularVuelto();
+    }
+
+    function calcularVuelto() {
+        let total = parseFloat(document.getElementById('lblTotal').innerText) || 0;
+        let pagaCon = parseFloat(document.getElementById('montoPagaCon').value) || 0;
+        let vuelto = pagaCon - total;
+        document.getElementById('lblVuelto').innerText = vuelto >= 0 ? '$' + vuelto : '$0';
+    }
+
+    function cerrarVenta() {
+        let nombre = document.getElementById('clienteNombre').value.trim() || 'Consumidor Final';
+        let cel = document.getElementById('clienteCel').value || '';
+        let dir = document.getElementById('clienteDireccion').value || 'En Local';
+        let horario = document.getElementById('clienteHorario').value.trim();
+        let obsGenerales = document.getElementById('observaciones').value.trim();
+        let total = parseFloat(document.getElementById('lblTotal').innerText) || 0;
+        let estadoPagoVal = document.getElementById('estadoPago').value;
+        let pagaConVal = parseFloat(document.getElementById('montoPagaCon').value) || 0;
+        let vueltoVal = pagaConVal > total ? pagaConVal - total : 0;
+        let cuponUsadoEnVenta = document.getElementById('selectAplicarCuponVenta').value || 'Ninguno';
+        let items = [];
+
+        document.querySelectorAll('#itemsTabla tr').forEach(fila => {
+            let cant = parseInt(fila.querySelector('.item-cant').value) || 1;
+            let nom = fila.querySelector('.item-nombre').value.trim();
+            let precioUni = parseFloat(fila.querySelector('.item-precio').value) || 0;
+
+            if(nom) {
+                let guarnicionesArrPorUnidad = [];
+                fila.querySelectorAll('.unidad-guarniciones-bloque').forEach(bloque => {
+                    let guarnsEstaUnidad = [];
+                    bloque.querySelectorAll('.guarnicion-row').forEach(row => {
+                        let gNombre = row.querySelector('.item-guarnicion-input').value.trim();
+                        let gPrecio = parseFloat(row.querySelector('.item-guarnicion-precio').value) || 0;
+                        if(gNombre) guarnsEstaUnidad.push({ nombre: gNombre, precio: gPrecio });
+                    });
+                    guarnicionesArrPorUnidad.push(guarnsEstaUnidad);
+                });
+
+                for(let i=0; i<cant; i++) {
+                    let guarnsUnidadActual = guarnicionesArrPorUnidad[i] || guarnicionesArrPorUnidad[0] || [{nombre: 'Sin guarnición', precio: 0}];
+                    let textoGuarnUnidad = guarnsUnidadActual.map(g => g.nombre + (g.precio > 0 ? ` (+$${g.precio})` : '')).join(' + ');
+
+                    items.push({
+                        cantidad: 1,
+                        nombre: nom,
+                        precio: precioUni,
+                        guarnicion: textoGuarnUnidad,
+                        guarnicionesArr: guarnicionesArrPorUnidad
+                    });
+                }
+            }
+        });
+
+        if(items.length === 0) { alert('Agregue al menos un ítem.'); return; }
+
+        let idVenta = editandoId ? editandoId : Math.floor(1000 + Math.random() * 9000);
+
+        let ventaObj = {
+            id: idVenta,
+            fechaYyyyMmDd: new Date().toISOString().slice(0, 10),
+            fechaTexto: new Date().toLocaleDateString(),
+            horaCreacion: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+            horario, nombre, cel, dir, obs: obsGenerales, tipo: tipoPedidoActual, medioPago: medioPagoActual, 
+            estadoPago: estadoPagoVal, pagaCon: pagaConVal, vuelto: vueltoVal,
+            estadoCocina: 'Pendiente', cobrado: (estadoPagoVal.includes('PAGADO')), despachado: false, cuponUsado: cuponUsadoEnVenta, items, total
+        };
+
+        if (editandoId) {
+            let idx = ventasHoy.findIndex(v => v.id == editandoId);
+            if (idx !== -1) {
+                ventaObj.despachado = ventasHoy[idx].despachado || false;
+                ventaObj.estadoCocina = ventasHoy[idx].estadoCocina || 'Pendiente';
+                ventasHoy[idx] = ventaObj;
+            }
+            editandoId = null;
+            document.getElementById('tituloCaja').innerText = 'Caja POS (Nuevo Pedido)';
+            document.getElementById('btnAccionVenta').innerText = '🖨️ Cerrar Venta, Imprimir y Enviar a Cocina';
+            document.getElementById('btnCancelarEdicion').style.display = 'none';
+        } else {
+            ventasHoy.push(ventaObj);
+            imprimirTicket(ventaObj);
+        }
+
+        estadosCocinaAnteriores[idVenta] = 'Pendiente';
+        db.ref('wayki_ventas').set(ventasHoy);
+
+        let pedidoParaCocina = {
+            id: idVenta,
+            nombre,
+            dir,
+            horarioEntrega: horario,
+            obs: obsGenerales,
+            items,
+            estadoCocina: 'Pendiente',
+            despachado: false
+        };
+
+        db.ref('wayki_cocina').once('value', (snapshot) => {
+            let cocinaData = snapshot.val() || [];
+            let listaCocina = Array.isArray(cocinaData) ? cocinaData.filter(p => p !== null) : Object.values(cocinaData);
+            let indexExistente = listaCocina.findIndex(p => p.id == idVenta);
+            if (indexExistente !== -1) {
+                listaCocina[indexExistente] = pedidoParaCocina;
+            } else {
+                listaCocina.push(pedidoParaCocina);
+            }
+            db.ref('wayki_cocina').set(listaCocina);
+        });
+
+        actualizarBaseClientesAutomatica();
+        limpiarFormularioDatos();
+        alert('¡Venta cerrada, enviada a cocina e impresa con éxito!');
+    }
+
+    function editarVenta(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if(!v) return;
+        editandoId = id;
+        document.getElementById('clienteNombre').value = v.nombre;
+        document.getElementById('clienteCel').value = v.cel || '';
+        document.getElementById('clienteDireccion').value = v.dir || '';
+        document.getElementById('clienteHorario').value = v.horario || '';
+        document.getElementById('observaciones').value = v.obs || '';
+        if(v.estadoPago) document.getElementById('estadoPago').value = v.estadoPago;
+        if(v.pagaCon) document.getElementById('montoPagaCon').value = v.pagaCon;
+        document.getElementById('tituloCaja').innerText = `✏️ Editando Pedido #${v.id}`;
+        document.getElementById('btnAccionVenta').innerText = '💾 Guardar Cambios del Pedido';
+        document.getElementById('btnCancelarEdicion').style.display = 'inline-block';
+
+        let tbody = document.getElementById('itemsTabla');
+        tbody.innerHTML = '';
+        v.items.forEach(it => {
+            agregarFila({ cantidad: it.cantidad, nombre: it.nombre, precio: it.precio, guarnicionesArr: it.guarnicionesArr || [] });
+        });
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function repetirMenuVenta(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if(!v) return;
+        document.getElementById('clienteNombre').value = v.nombre;
+        document.getElementById('clienteCel').value = v.cel || '';
+        document.getElementById('clienteDireccion').value = v.dir || '';
+        document.getElementById('observaciones').value = v.obs || '';
+        
+        let tbody = document.getElementById('itemsTabla');
+        tbody.innerHTML = '';
+        v.items.forEach(it => {
+            agregarFila({ cantidad: it.cantidad, nombre: it.nombre, precio: it.precio, guarnicionesArr: it.guarnicionesArr || [] });
+        });
+        calcularTotal();
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        alert('✨ Menú repetido y autocompletado en la caja para el cliente ' + v.nombre);
+    }
+
+    function cancelarEdicion() {
+        editandoId = null;
+        document.getElementById('tituloCaja').innerText = 'Caja POS (Nuevo Pedido)';
+        document.getElementById('btnAccionVenta').innerText = '🖨️ Cerrar Venta, Imprimir y Enviar a Cocina';
+        document.getElementById('btnCancelarEdicion').style.display = 'none';
+        limpiarFormularioDatos();
+    }
+
+    function anularVenta(id) {
+        if(confirm(`¿Estás seguro de anular el pedido #${id}?`)) {
+            ventasHoy = ventasHoy.filter(v => v.id != id);
+            db.ref('wayki_ventas').set(ventasHoy);
+            
+            db.ref('wayki_cocina').once('value', (snapshot) => {
+                let cocinaData = snapshot.val() || [];
+                let listaCocina = Array.isArray(cocinaData) ? cocinaData.filter(p => p !== null && p.id != id) : Object.values(cocinaData).filter(p => p.id != id);
+                db.ref('wayki_cocina').set(listaCocina);
+            });
+
+            renderVentas();
+        }
+    }
+
+    function toggleCobrado(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if(v) {
+            v.cobrado = !v.cobrado;
+            db.ref('wayki_ventas').set(ventasHoy);
+            renderVentas();
+        }
+    }
+
+    function toggleDespachado(id) {
+        let v = ventasHoy.find(item => item.id == id);
+        if(v) {
+            v.despachado = !v.despachado;
+            db.ref('wayki_ventas').set(ventasHoy);
+            
+            db.ref('wayki_cocina').once('value', (snapshot) => {
+                let data = snapshot.val() || [];
+                let lista = Array.isArray(data) ? data.filter(p => p !== null) : Object.values(data);
+                let pCocina = lista.find(p => p.id == id);
+                if(pCocina) {
+                    pCocina.despachado = v.despachado;
+                    db.ref('wayki_cocina').set(lista);
+                }
+            });
+        }
+    }
+
+    function enviarWspPedido(cel, nombre, dir, idPedido) {
+        if(!cel) { alert('Este cliente no tiene número de celular registrado.'); return; }
+        let telLimpio = cel.replace(/\D/g, '');
+        let saludo = (nombre && nombre.toLowerCase() !== 'consumidor final' && nombre.trim() !== '') ? `¡Hola ${nombre}!` : `¡Hola!`;
+        let numPedidoTexto = idPedido ? ` N° ${idPedido}` : '';
+        let mensaje = `${saludo} Somos de Wayki Casa de Comidas. Su pedido${numPedidoTexto} ya está en camino 🛵💨 a ${dir}. ¡Gracias!`;
+        window.open(`https://wa.me/549${telLimpio}?text=${encodeURIComponent(mensaje)}`, 'wsp_wayki_tab');
+    }
+
+    function enviarWspActualGeneral() {
+        let nombre = document.getElementById('clienteNombre').value.trim() || 'Consumidor Final';
+        let cel = document.getElementById('clienteCel').value;
+        let dir = document.getElementById('clienteDireccion').value || 'tu domicilio';
+        if(!cel) { alert('Ingrese un celular válido.'); return; }
+        let saludo = (nombre && nombre.toLowerCase() !== 'consumidor final' && nombre !== '') ? `¡Hola ${nombre}!` : `¡Hola!`;
+        let mensaje = `${saludo} Somos de Wayki Casa de Comidas. Su pedido ya está en camino 🛵💨 a ${dir}. ¡Gracias!`;
+        let telLimpio = cel.replace(/\D/g, '');
+        window.open(`https://wa.me/549${telLimpio}?text=${encodeURIComponent(mensaje)}`, 'wsp_wayki_tab');
+    }
+
+    function limpiarFormularioDatos() {
+        document.getElementById('clienteNombre').value = ''; document.getElementById('clienteCel').value = '';
+        document.getElementById('clienteDireccion').value = ''; document.getElementById('clienteHorario').value = '';
+        document.getElementById('observaciones').value = '';
+        document.getElementById('itemsTabla').innerHTML = '';
+        document.getElementById('montoDescuentoManual').value = '0';
+        document.getElementById('montoPagaCon').value = '';
+        document.getElementById('lblVuelto').innerText = '$0';
+        document.getElementById('selectAplicarCuponVenta').value = '';
+        document.getElementById('infoCuponEstadoCel').value = '';
+        agregarFila(); calcularTotal();
+    }
+
+    function imprimirTicket(v) {
+        document.getElementById('t-nombre-negocio').innerText = configNegocio.nombre;
+        document.getElementById('t-nro').innerText = v.id;
+        document.getElementById('t-fecha').innerText = v.horario ? v.horario : (v.horaCreacion + ' (Sin horario)');
+        document.getElementById('t-cliente').innerText = v.nombre;
+        document.getElementById('t-tel').innerText = v.cel || 'S/N';
+        document.getElementById('t-dir').innerText = v.dir;
+        
+        let boxObs = document.getElementById('t-box-obs');
+        if (v.obs && v.obs.trim() !== '') {
+            boxObs.style.display = 'block';
+            document.getElementById('t-obs').innerText = v.obs;
+        } else {
+            boxObs.style.display = 'none';
+        }
+
+        document.getElementById('t-pago').innerText = v.estadoPago || 'A COBRAR';
+        document.getElementById('t-medio-pago').innerText = v.medioPago || 'Efectivo';
+        document.getElementById('t-total').innerText = v.total;
+
+        let boxVuelto = document.getElementById('t-box-vuelto');
+        if (v.pagaCon && v.pagaCon > 0) {
+            boxVuelto.style.display = 'block';
+            document.getElementById('t-pagacon').innerText = v.pagaCon;
+            document.getElementById('t-vuelto').innerText = '$' + (v.vuelto || 0);
+        } else {
+            boxVuelto.style.display = 'none';
+        }
+
+        let html = '';
+        v.items.forEach(it => {
+            let guarTxt = it.guarnicion && it.guarnicion !== 'Sin guarnición' ? `<br>&nbsp;&nbsp;↳ [${it.guarnicion}]` : '';
+            html += `<div style="margin-bottom:4px;"><b>${it.cantidad}x</b> ${it.nombre} ($${it.precio})${guarTxt}</div>`;
+        });
+        document.getElementById('t-items').innerHTML = html;
+
+        document.getElementById('sub-t-nro').innerText = v.id;
+        document.getElementById('sub-t-cliente').innerText = v.nombre;
+        document.getElementById('sub-t-tel').innerText = v.cel || 'S/N';
+        document.getElementById('sub-t-dir').innerText = v.dir;
+
+        let subBoxObs = document.getElementById('sub-t-box-obs');
+        if (v.obs && v.obs.trim() !== '') {
+            subBoxObs.style.display = 'block';
+            document.getElementById('sub-t-obs').innerText = v.obs;
+        } else {
+            subBoxObs.style.display = 'none';
+        }
+
+        let instruccionCobro = '';
+        if (v.estadoPago && v.estadoPago.includes('PAGADO')) {
+            instruccionCobro = '(ESTADO: PAGADO - NO COBRAR)';
+        } else if (v.medioPago === 'Transferencia') {
+            instruccionCobro = '(TRANSMITE / TRANSFIERE AL RECIBIR)';
+        } else {
+            let efectivoACobrar = v.total;
+            let vueltoStr = v.vuelto > 0 ? ` | Vuelto: $${v.vuelto} (Paga con $${v.pagaCon})` : '';
+            instruccionCobro = `(A COBRAR: $${efectivoACobrar}${vueltoStr})`;
+        }
+        document.getElementById('sub-t-instruccion-cobro').innerText = instruccionCobro;
+
+        document.getElementById('ticket-impresion').style.display = 'block';
+        window.print();
+        document.getElementById('ticket-impresion').style.display = 'none';
+    }
+
+    // RENDERIZAR VENTAS CON EL NUEVO ESQUEMA DE COLORES Y ESTADOS DE COCINA
+    function renderVentas() {
+        let contenedor = document.getElementById('listaVentas');
+        if(ventasHoy.length === 0) { contenedor.innerHTML = '<p style="color:#777; font-size:13px;">No hay ventas hoy.</p>'; return; }
+        
+        let ahora = new Date();
+        let horaActualMinutos = ahora.getHours() * 60 + ahora.getMinutes();
+
+        let ventasConClasificacion = ventasHoy.map(v => {
+            let tieneHorario = v.horario && v.horario.trim() !== '';
+            let minutosPedido = 9999;
+            let esRojo = false, esAmarillo = false, esAzul = false;
+            let esVerde = false, esRosa = false;
+            let esBlanco = v.despachado === true;
+            let estaListo = v.estadoCocina === 'Listo';
+
+            if (tieneHorario) {
+                let partes = v.horario.replace(':', '').trim().match(/.{1,2}/g);
+                if (partes && partes.length >= 2) {
+                    minutosPedido = parseInt(partes[0]) * 60 + parseInt(partes[1]);
+                    if (minutosPedido - horaActualMinutos <= 10) esRojo = true;
+                    else esAmarillo = true;
+                } else { esAzul = true; }
+            } else { esAzul = true; }
+
+            // Si ya está listo en cocina y no ha sido despachado:
+            // Verde si era azul (sin horario), Rosa si era con horario (amarillo o rojo)
+            if (!esBlanco && estaListo) {
+                if (esAzul) esVerde = true;
+                else esRosa = true;
+            }
+
+            // Jerarquía de orden: Rojo (1) > Rosa (2) > Amarillo (3) > Verde (4) > Azul (5) > Blanco/Entregado (6)
+            let prioridadGrupo = 5;
+            if (esBlanco) prioridadGrupo = 6;
+            else if (esRojo) prioridadGrupo = 1;
+            else if (esRosa) prioridadGrupo = 2;
+            else if (esAmarillo) prioridadGrupo = 3;
+            else if (esVerde) prioridadGrupo = 4;
+            else if (esAzul) prioridadGrupo = 5;
+
+            return { ...v, prioridadGrupo, minutosPedido, esRojo, esAmarillo, esAzul, esVerde, esRosa, esBlanco, estaListo };
+        });
+
+        ventasConClasificacion.sort((a, b) => {
+            if (a.prioridadGrupo !== b.prioridadGrupo) return a.prioridadGrupo - b.prioridadGrupo;
+            return a.minutosPedido - b.minutosPedido;
+        });
+
+        let html = '';
+        ventasConClasificacion.forEach(v => {
+            let claseCss = 'sale-item';
+            if (v.esBlanco) claseCss += ' comanda-blanca';
+            else if (v.esRojo) claseCss += ' comanda-roja';
+            else if (v.esRosa) claseCss += ' comanda-rosa';
+            else if (v.esAmarillo) claseCss += ' comanda-amarilla';
+            else if (v.esVerde) claseCss += ' comanda-verde';
+            else if (v.esAzul) claseCss += ' comanda-azul';
+
+            let itemsTexto = v.items.map(i => `<b>${i.cantidad}x</b> ${i.nombre}`).join(', ');
+            let cobradoTxt = v.cobrado ? '🟢 Cobrado' : '⚠️ A Cobrar';
+            let estadoCocinaTxt = v.estaListo ? '🟢 ¡Listo!' : '🍳 En Cocina';
+            let despachadoTxt = v.despachado ? '☑️ Entregado' : '📦 Marcar Entregado';
+
+            html += `
+                <div class="${claseCss}">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <b>🕒 ${v.horario || 'Sin hora'} | #${v.id}</b>
+                        <div>
+                            <span style="background:${v.estaListo?'#27ae60':'#e67e22'}; color:white; padding:2px 6px; border-radius:3px; font-size:10px; font-weight:bold;">${estadoCocinaTxt}</span>
+                            <span style="cursor:pointer; background:${v.cobrado?'#27ae60':'#f39c12'}; color:white; padding:2px 6px; border-radius:3px; font-size:10px; font-weight:bold; margin-left:4px;" onclick="toggleCobrado(${v.id})">${cobradoTxt}</span>
+                            <span style="cursor:pointer; background:${v.despachado?'#27ae60':'#34495e'}; color:white; padding:2px 6px; border-radius:3px; font-size:10px; font-weight:bold; margin-left:4px;" onclick="toggleDespachado(${v.id})">${despachadoTxt}</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:4px;"><b>${v.nombre}</b> (${v.tipo}) - Tel: ${v.cel || 'S/N'}<br>Dir: ${v.dir}</div>
+                    <div style="margin-top:4px; color:#555;">Platos: ${itemsTexto}</div>
+                    <div style="margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+                        <b style="font-size:13px; color:#e67e22;">Total: $${v.total}</b>
+                        <div style="display:flex; gap:3px;">
+                            <a class="btn-wsp-card" href="javascript:void(0)" onclick="enviarWspPedido('${v.cel}', '${v.nombre.replace(/'/g, "\\'")}', '${v.dir.replace(/'/g, "\\'")}', ${v.id})">💬 Wsp</a>
+                            <button class="btn-print" onclick="imprimirTicketByData(${v.id})">🖨️ Re</button>
+                            <button class="btn-repeat" onclick="repetirMenuVenta(${v.id})">🔄</button>
+                            <button class="btn-edit" onclick="editarVenta(${v.id})">✏️</button>
+                            <button class="btn-danger" onclick="anularVenta(${v.id})">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        contenedor.innerHTML = html;
+    }
+
+    function imprimirTicketByData(id) { let v = ventasHoy.find(item => item.id == id); if(v) imprimirTicket(v); }
+    function setTipoPedido(tipo) { tipoPedidoActual = tipo; document.getElementById('btnDelivery').className = tipo === 'Delivery' ? 'toggle-btn active' : 'toggle-btn'; document.getElementById('btnMostrador').className = tipo === 'Mostrador' ? 'toggle-btn active' : 'toggle-btn'; }
+    function setPago(p) { medioPagoActual = p; document.getElementById('btnEfectivo').className = 'toggle-btn active-blue'; document.getElementById('btnTransferencia').className = 'toggle-btn'; }
+    function setTransferencia(p) { medioPagoActual = p; document.getElementById('btnTransferencia').className = 'toggle-btn active-blue'; document.getElementById('btnEfectivo').className = 'toggle-btn'; }
+    
+    function abrirReportes() {
+        if (rolActual !== 'admin') { alert('Acceso restringido solo para administradores.'); return; }
+        let hoyStr = new Date().toISOString().slice(0, 10);
+        document.getElementById('fechaDesde').value = hoyStr;
+        document.getElementById('fechaHasta').value = hoyStr;
+        document.getElementById('modalReportes').style.display = 'flex';
+        calcularReporteRango();
+    }
+    function cerrarReportes() { document.getElementById('modalReportes').style.display = 'none'; }
+
+    function calcularReporteRango() {
+        let desde = document.getElementById('fechaDesde').value;
+        let hasta = document.getElementById('fechaHasta').value;
+        let efectivo = 0, transferencia = 0, totalGastosRango = 0;
+
+        ventasHoy.forEach(v => {
+            let f = v.fechaYyyyMmDd || '';
+            if (f >= desde && f <= hasta) {
+                if (v.medioPago === 'Efectivo') efectivo += parseFloat(v.total) || 0;
+                else transferencia += parseFloat(v.total) || 0;
+            }
+        });
+
+        gastosRegistrados.forEach(g => {
+            let f = g.fechaYyyyMmDd || '';
+            if (f >= desde && f <= hasta) {
+                totalGastosRango += parseFloat(g.monto) || 0;
+            }
+        });
+
+        let ventasTotales = efectivo + transferencia;
+        let gananciaNeta = ventasTotales - totalGastosRango;
+
+        document.getElementById('repEfectivo').innerText = '$' + efectivo;
+        document.getElementById('repTransf').innerText = '$' + transferencia;
+        document.getElementById('repVentasTotal').innerText = '$' + ventasTotales;
+        document.getElementById('repGastosTotal').innerText = '$' + totalGastosRango;
+        let lblNeta = document.getElementById('repGananciaNeta');
+        lblNeta.innerText = '$' + gananciaNeta;
+        lblNeta.style.color = gananciaNeta >= 0 ? '#27ae60' : '#c0392b';
+    }
+
+    function exportarReporteVentasExcel() {
+        if (rolActual !== 'admin') { alert('Acceso restringido solo para administradores.'); return; }
+        let wb = XLSX.utils.book_new();
+        let wsData = [["=== REPORTE DE VENTAS ==="], ["ID Venta", "Fecha", "Horario", "Cliente", "Celular", "Dirección", "Medio de Pago", "Total ($)"]];
+        let totalVentasExport = 0;
+        if (ventasHoy.length > 0) {
+            ventasHoy.forEach(v => {
+                totalVentasExport += parseFloat(v.total) || 0;
+                wsData.push([v.id, v.fechaTexto || '', v.horario || '', v.nombre || '', v.cel || '', v.dir || '', v.medioPago || '', v.total || 0]);
+            });
+        } else {
+            wsData.push(["Sin ventas registradas para el día de hoy", "", "", "", "", "", "", ""]);
+        }
+
+        wsData.push([]);
+        wsData.push(["TOTAL VENTAS", "", "", "", "", "", "", totalVentasExport]);
+        wsData.push([]);
+        wsData.push(["=== GASTOS OPERATIVOS ==="]);
+        wsData.push(["Fecha", "Concepto / Detalle", "Monto ($)"]);
+
+        let totalGastosExport = 0;
+        if (gastosRegistrados.length > 0) {
+            gastosRegistrados.forEach(g => {
+                totalGastosExport += parseFloat(g.monto) || 0;
+                wsData.push([g.fechaTexto || '', g.concepto || '', g.monto || 0]);
+            });
+        } else {
+            wsData.push(["", "Sin gastos registrados", 0]);
+        }
+
+        wsData.push([]);
+        wsData.push(["TOTAL GASTOS", "", totalGastosExport]);
+        wsData.push([]);
+        wsData.push(["BALANCE NETO FINAL (VENTAS - GASTOS)", "", totalVentasExport - totalGastosExport]);
+
+        let ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "ReporteFinanciero");
+        XLSX.writeFile(wb, `Reporte_Financiero_Wayki_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    function abrirPanelCupones() { document.getElementById('modalPanelCupones').style.display = 'flex'; }
+    function cerrarPanelCupones() { document.getElementById('modalPanelCupones').style.display = 'none'; }
+    function abrirModalCrearCupoAdmin() { document.getElementById('modalCrearCupoAdmin').style.display = 'flex'; }
+    function cerrarModalCrearCupoAdmin() { document.getElementById('modalCrearCupoAdmin').style.display = 'none'; }
+    function guardarNuevoCupoAdmin() {
+        let codigo = document.getElementById('nuevoCupCodigo').value.trim().toUpperCase();
+        let tipo = document.getElementById('nuevoCupTipo').value;
+        let valor = parseFloat(document.getElementById('nuevoCupValor').value) || 0;
+        let diasVigencia = parseInt(document.getElementById('nuevoCupDias').value) || 2;
+        let destinatario = document.getElementById('nuevoCupDestinatario').value;
+        if(!codigo && destinatario === 'general') { alert('Ingrese código'); return; }
+        cuponesConfigurados.push({ codigo, tipo, valor, diasVigencia, destinatario });
+        db.ref('wayki_config_web/cuponesCustom').set(cuponesConfigurados).then(() => {
+            cerrarModalCrearCupoAdmin(); alert('¡Cupón guardado!');
+        });
+    }
+</script>
+
+</body>
+</html>

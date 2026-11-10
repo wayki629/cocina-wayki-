@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Wayki - Comandera Cocina TV Box</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        body { background-color: #111; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 15px; }
+        
+        .header-pantalla {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header-pantalla h1 { 
+            color: #e63946; 
+            margin: 0; 
+            font-size: 24px; 
+            flex: 1;
+            text-align: center;
+        }
+
+        #reloj-digital {
+            font-family: monospace;
+            font-size: 26px;
+            font-weight: bold;
+            color: #38bdf8;
+            background: #1e293b;
+            padding: 5px 15px;
+            border-radius: 6px;
+            border: 1px solid #334155;
+        }
+
+        .grilla-comandera {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+
+        /* TARJETAS DE COMANDAS COLORES Y ESTADOS */
+        .tarjeta-pedido {
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Azul para pedidos sin horario (En Cocina) */
+        .tarjeta-pedido.comanda-azul {
+            background: #1e3a8a;
+            border: 2px solid #3b82f6;
+        }
+
+        /* Amarillo Ocre para con horario (En Cocina) */
+        .tarjeta-pedido.comanda-amarilla {
+            background: #78350f; 
+            border: 2px solid #f59e0b; 
+        }
+
+        /* Rojo Parpadeante URGENTE (últimos 10 min) */
+        @keyframes parpadeoAlerta {
+            0% { background: #991b1b; border-color: #ef4444; }
+            50% { background: #b91c1c; border-color: #f87171; box-shadow: 0 0 20px rgba(239, 68, 68, 0.7); }
+            100% { background: #991b1b; border-color: #ef4444; }
+        }
+
+        .tarjeta-pedido.comanda-roja {
+            animation: parpadeoAlerta 1.5s infinite;
+        }
+
+        .header-pedido {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        .num-pedido { font-size: 18px; font-weight: bold; color: #f8fafc; }
+        .badge-hora { background: #0f172a; padding: 3px 6px; border-radius: 4px; font-size: 13px; color: #f59e0b; font-weight: bold; }
+        
+        .info-cliente { font-size: 13px; margin-bottom: 8px; color: #cbd5e1; }
+        .info-cliente .direccion { color: #38bdf8; font-weight: bold; font-size: 14px; }
+
+        .lista-items { font-size: 13px; margin-bottom: 10px; padding-left: 15px; }
+        
+        .btn-listo {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
+        }
+        .btn-listo:hover { background: #219653; }
+
+        #bannerAudio {
+            background: #e67e22;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bannerAudio" onclick="activarAudioSistema()">
+        🔊 HAGÁ CLIC ACÁ PARA ACTIVAR LAS ALERTAS SI EL NAVEGADOR LAS BLOQUEÓ
+    </div>
+
+    <div class="header-pantalla">
+        <div style="width: 150px;"></div>
+        <h1>🍳 WAYKI - COMANDERA EN TIEMPO REAL</h1>
+        <div id="reloj-digital">00:00:00</div>
+    </div>
+    
+    <div id="contenedor-comandas" class="grilla-comandera"></div>
+
+    <audio id="audioNuevo" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="audioTimbreLargo" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2860/2860-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEuKDbrqXTfMM7Z6PLpTB6TsVCvvHWq_o",
+            authDomain: "wayki-cocina.firebaseapp.com",
+            projectId: "wayki-cocina",
+            storageBucket: "wayki-cocina.firebasestorage.app",
+            messagingSenderId: "750389109772",
+            appId: "1:750389109772:web:b8d290bf5dbc1fd339fa29"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let listaPedidosCocina = [];
+        let cantidadAnterior = -1;
+        let audioHabilitado = false;
+        let pedidosAvisados10Min = new Set(); 
+
+        window.addEventListener('DOMContentLoaded', () => {
+            intentarActivarAudioAutomatico();
+        });
+
+        function intentarActivarAudioAutomatico() {
+            let audio1 = document.getElementById('audioNuevo');
+            let audio2 = document.getElementById('audioTimbreLargo');
+            
+            Promise.all([audio1.play(), audio2.play()]).then(() => {
+                audio1.pause(); audio1.currentTime = 0;
+                audio2.pause(); audio2.currentTime = 0;
+                audioHabilitado = true;
+                document.getElementById('bannerAudio').style.display = 'none';
+            }).catch(e => {
+                document.getElementById('bannerAudio').style.display = 'block';
+            });
+        }
+
+        function activarAudioSistema() {
+            let audio1 = document.getElementById('audioNuevo');
+            let audio2 = document.getElementById('audioTimbreLargo');
+            
+            Promise.all([audio1.play(), audio2.play()]).then(() => {
+                audio1.pause(); audio1.currentTime = 0;
+                audio2.pause(); audio2.currentTime = 0;
+                audioHabilitado = true;
+                document.getElementById('bannerAudio').style.display = 'none';
+            }).catch(e => {});
+        }
+
+        function actualizarReloj() {
+            let ahora = new Date();
+            let hh = String(ahora.getHours()).padStart(2, '0');
+            let mm = String(ahora.getMinutes()).padStart(2, '0');
+            let ss = String(ahora.getSeconds()).padStart(2, '0');
+            document.getElementById('reloj-digital').innerText = `${hh}:${mm}:${ss}`;
+
+            verificarAlertas10Minutos(ahora);
+        }
+        setInterval(actualizarReloj, 1000);
+        actualizarReloj();
+
+        function convertirMinutos(horarioStr) {
+            if (!horarioStr) return -1;
+            let horaLimpia = horarioStr.toString().trim();
+            let hStr = "", mStr = "";
+
+            if (horaLimpia.length === 4) {
+                hStr = horaLimpia.slice(0, 2);
+                mStr = horaLimpia.slice(2);
+            } else if (horaLimpia.length === 3) {
+                hStr = "0" + horaLimpia.slice(0, 1);
+                mStr = horaLimpia.slice(1);
+            } else if (horaLimpia.includes(":")) {
+                let partes = horaLimpia.split(":");
+                hStr = partes[0];
+                mStr = partes[1];
+            }
+            return parseInt(hStr) * 60 + parseInt(mStr);
+        }
+
+        function verificarAlertas10Minutos(ahora) {
+            let horaActualMinutos = ahora.getHours() * 60 + ahora.getMinutes();
+            let huboCambioAlerta = false;
+
+            listaPedidosCocina.forEach(pedido => {
+                if (pedido.horarioEntrega && pedido.horarioEntrega.trim() !== "") {
+                    let pedidoMinutos = convertirMinutos(pedido.horarioEntrega);
+                    let diferenciaMinutos = pedidoMinutos - horaActualMinutos;
+
+                    if (diferenciaMinutos <= 10 && diferenciaMinutos >= 0) {
+                        if (!pedidosAvisados10Min.has(pedido.id)) {
+                            pedidosAvisados10Min.add(pedido.id);
+                            if (audioHabilitado) {
+                                let timbre = document.getElementById('audioTimbreLargo');
+                                timbre.currentTime = 0;
+                                timbre.play().catch(err => console.log(err));
+                            }
+                        }
+                        huboCambioAlerta = true;
+                    }
+                }
+            });
+
+            if (huboCambioAlerta) {
+                renderizarPantallaCocina();
+            }
+        }
+
+        function formatearHora(val) {
+            if (!val) return "";
+            let str = val.toString().trim();
+            if (str.length === 4) return str.slice(0, 2) + ":" + str.slice(2);
+            if (str.length === 3) return "0" + str.slice(0, 1) + ":" + str.slice(1);
+            return str;
+        }
+
+        // SINCRONIZACIÓN EN TIEMPO REAL CON FIREBASE
+        db.ref('wayki_cocina').on('value', (snapshot) => {
+            let data = snapshot.val();
+            let nuevosPedidos = [];
+            if (data) {
+                nuevosPedidos = Array.isArray(data) ? data.filter(p => p !== null) : Object.values(data);
+            }
+
+            if (cantidadAnterior !== -1 && nuevosPedidos.length > cantidadAnterior) {
+                if (audioHabilitado) {
+                    let audio = document.getElementById('audioNuevo');
+                    audio.currentTime = 0;
+                    audio.play().catch(err => console.log(err));
+                }
+            }
+            
+            cantidadAnterior = nuevosPedidos.length;
+            listaPedidosCocina = nuevosPedidos;
+            renderizarPantallaCocina();
+        });
+
+        function renderizarPantallaCocina() {
+            let contenedor = document.getElementById('contenedor-comandas');
+            contenedor.innerHTML = "";
+
+            // FILTRAR: Solo mostrar los que NO están marcados como LISTOS (ocultos de la cocina al instante) y NO despachados
+            let pendientesCocina = listaPedidosCocina.filter(p => p.estadoCocina !== 'Listo' && !p.despachado);
+
+            if (pendientesCocina.length === 0) {
+                contenedor.innerHTML = `<p style="color: #888; font-size: 16px; text-align: center; grid-column: span 3;">No hay comandas pendientes en este momento. ¡Todo al día! 🚀</p>`;
+                return;
+            }
+
+            let horaActualMinutos = new Date().getHours() * 60 + new Date().getMinutes();
+
+            let listaProcesada = pendientesCocina.map(pedido => {
+                let tieneHorario = pedido.horarioEntrega && pedido.horarioEntrega.trim() !== "";
+                let minutosPedido = convertirMinutos(pedido.horarioEntrega);
+                let diff = minutosPedido - horaActualMinutos;
+                let esRojo = tieneHorario && diff <= 10 && diff >= 0;
+                let esAmarillo = tieneHorario && !esRojo;
+                let esAzul = !tieneHorario;
+
+                let claseColor = 'comanda-azul';
+                if (esRojo) claseColor = 'comanda-roja';
+                else if (esAmarillo) claseColor = 'comanda-amarilla';
+                else claseColor = 'comanda-azul';
+
+                let prioridad = 3;
+                if (esRojo) prioridad = 1;
+                else if (esAmarillo) prioridad = 2;
+                else prioridad = 3;
+
+                return { ...pedido, tieneHorario, minutosPedido, esRojo, esAmarillo, esAzul, claseColor, prioridad };
+            });
+
+            listaProcesada.sort((a, b) => {
+                if (a.prioridad !== b.prioridad) return a.prioridad - b.prioridad;
+                return a.minutosPedido - b.minutosPedido;
+            });
+
+            listaProcesada.forEach(pedido => {
+                let horaBonita = formatearHora(pedido.horarioEntrega);
+                let claseCss = 'tarjeta-pedido ' + pedido.claseColor;
+
+                let itemsHtml = "<ul>";
+                if (pedido.items && Array.isArray(pedido.items)) {
+                    pedido.items.forEach(it => {
+                        let detalleGuarnicion = it.guarnicion && it.guarnicion !== 'Sin guarnición/salsa' ? ` [${it.guarnicion}]` : '';
+                        let detalleExtra = it.obsExtra ? ` (Obs: ${it.obsExtra})` : '';
+                        itemsHtml += `<li><b>${it.cantidad}x</b> ${it.nombre}${detalleGuarnicion}${detalleExtra}</li>`;
+                    });
+                }
+                itemsHtml += "</ul>";
+
+                let observacionesExtra = pedido.obs ? `<div style="font-size: 11px; color: #facc15; margin-top: 4px;"><b>Nota:</b> ${pedido.obs}</div>` : '';
+                let textoAlertaBadge = pedido.esRojo ? '🚨 ¡URGENTE (10 min)!' : (pedido.tieneHorario ? '🕒 ' + horaBonita + ' hs' : '⚡ Inmediato');
+
+                let div = document.createElement('div');
+                div.className = claseCss;
+                
+                div.innerHTML = `
+                    <div>
+                        <div class="header-pedido">
+                            <span class="num-pedido">Pedido #${pedido.id}</span>
+                            <span class="badge-hora" style="${pedido.esRojo ? 'background: #000; color: #fff;' : ''}">${textoAlertaBadge}</span>
+                        </div>
+                        <div class="info-cliente">
+                            <strong>👤 ${pedido.nombre || 'Cliente'}</strong><br>
+                            <span class="direccion">📍 ${pedido.dir || 'En Local'}</span>
+                        </div>
+                        <div class="lista-items">
+                            ${itemsHtml}
+                            ${observacionesExtra}
+                        </div>
+                    </div>
+                    <button class="btn-listo" onclick="marcarListoCocina(${pedido.id})">✔ Marcar como LISTO</button>
+                `;
+                contenedor.appendChild(div);
+            });
+        }
+
+        function marcarListoCocina(id) {
+            let pedidoEnCocina = listaPedidosCocina.find(p => p.id == id);
+            if (pedidoEnCocina) {
+                // 1. Marcar como 'Listo' (lo cual actualizará automáticamente el POS a Verde o Rosa)
+                pedidoEnCocina.estadoCocina = 'Listo';
+                db.ref('wayki_cocina').set(listaPedidosCocina);
+
+                // 2. Sincronizar el estado en el POS de la PC
+                db.ref('wayki_ventas').once('value', (snapshot) => {
+                    let ventasData = snapshot.val();
+                    if (ventasData) {
+                        let ventasArr = Array.isArray(ventasData) ? ventasData.filter(v => v !== null) : Object.values(ventasData);
+                        let ventaPos = ventasArr.find(v => v.id == id);
+                        if (ventaPos) {
+                            ventaPos.estadoCocina = 'Listo';
+                            db.ref('wayki_ventas').set(ventasArr);
+                        }
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
